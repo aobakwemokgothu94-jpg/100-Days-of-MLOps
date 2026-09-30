@@ -1,6 +1,7 @@
 # 100 Days of MLOps - Progress & Curriculum
 
-Welcome to the **100 Days of MLOps** tracking repository! This curriculum covers end-to-end Machine Learning Operations, including environment management, data versioning, experiment tracking, feature stores, containerization, model serving, monitoring, CI/CD, orchestration, and Kubernetes deployments.
+Welcome to the **100 Days of MLOps** tracking repository! This curriculum covers end-to-end Machine Learning Operations, including environment management, data versioning, experiment tracking, feature stores, containerization, model serving, monitoring, CI/CD, orchestration, and Kubernetes deployments
+
 A hands-on MLOps repository demonstrating production-ready machine learning lifecycle practices. Features automated data pipelines, experiment tracking, CI/CD workflows for model deployment, automated testing, containerized microservices, and continuous performance monitoring
 ---
 
