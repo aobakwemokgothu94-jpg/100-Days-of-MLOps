@@ -1,1 +1,48 @@
+"""
+MLflow Autologging Scaffold
+---------------------------
+Date: October 3, 2026
+Task: Day 24: Enable MLflow Autologging (100 Days of MLOps)
 
+Description:
+Replaces boilerplate log_param and log_metric calls with MLflow's autologging
+feature to automatically capture hyperparameters, metrics, and model artifacts.
+"""
+
+import mlflow
+import mlflow.sklearn
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+
+# Step 1: Configure MLflow tracking server connection
+mlflow.set_tracking_uri("http://localhost:5000")
+
+# Step 2: Set or create the target experiment
+mlflow.set_experiment("autolog-demo")
+
+# Step 3: Enable MLflow autologging for scikit-learn
+mlflow.autolog()
+
+# Step 4: Create synthetic dataset
+X, y = make_classification(n_samples=100, n_features=4, random_state=42)
+
+# Step 5: Fit model (autologging automatically records parameters, metrics, and artifacts)
+model = LogisticRegression(C=1.0, max_iter=100, solver="lbfgs")
+model.fit(X, y)
+
+print("Training run completed successfully.")
+
+# Day 24: Enable MLflow Autologging
+
+## Overview
+This task integrates MLflow's `mlflow.autolog()` feature into an `scikit-learn` training script to eliminate manual tracking boilerplate code.
+
+## Verification Checklist
+- [x] Experiment `autolog-demo` created on the MLflow server.
+- [x] Active training run logged under `autolog-demo`.
+- [x] Implicit and explicit estimator constructor parameters captured (`C`, `max_iter`, `solver`, `tol`, `penalty`, etc.).
+- [x] Artifact directory generated containing `MLmodel` and serialized `.pkl` estimator binaries.
+
+## Environment Details
+- **Tracking Server URI:** `http://localhost:5000`
+- **Script Path:** `/root/code/autolog_experiment.py`
