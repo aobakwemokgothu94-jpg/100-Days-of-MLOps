@@ -1,1 +1,80 @@
+# MLOps Task: Register & Manage Model Lifecycle with MLflow
 
+## Overview
+This task required promoting two pre-trained runs from an MLflow experiment (`fraud-detection`) into the MLflow Model Registry to enable the operations team to monitor serving traffic effectively.
+
+---
+
+## Requirements & Constraints
+
+1. **Registered Model:** Create a registered model named `fraud-detector`.
+2. **Model Description:** Add a model-level description referencing the word `fraud` (e.g., `"Fraud detection model for xFusionCorp transactions"`).
+3. **Sequential Versioning:**
+   - **Version 1:** Baseline run (`n_estimators=100`, `max_depth=5`, `f1_score=0.80`) with alias **`challenger`**.
+   - **Version 2:** Improved run (`n_estimators=200`, `max_depth=10`, `f1_score=0.89`) with alias **`champion`**.
+
+---
+
+## Solution & Implementation
+
+The task was executed programmatically using Python and the MLflow Tracking Client API (`mlflow.tracking.MlflowClient`).
+
+### Script: `register_models.py`
+
+```python
+import mlflow
+from mlflow.tracking import MlflowClient
+
+# 1. Connect to MLflow Tracking Server
+mlflow.set_tracking_uri("http://localhost:5000")
+client = MlflowClient()
+
+MODEL_NAME = "fraud-detector"
+EXP_NAME = "fraud-detection"
+DESCRIPTION = "Fraud detection model for xFusionCorp transactions"
+
+def register_fraud_models():
+    # Clean up any previously existing registered model
+    try:
+        client.delete_registered_model(MODEL_NAME)
+        print(f"Cleaned up existing model: '{MODEL_NAME}'.")
+    except Exception:
+        pass
+
+    # Retrieve experiment runs sorted chronologically
+    exp = client.get_experiment_by_name(EXP_NAME)
+    runs = client.search_runs(exp.experiment_id, order_by=["attribute.start_time ASC"])
+
+    # Identify runs by hyperparameter signature
+    baseline_run = [r for r in runs if r.data.params.get("n_estimators") == "100"][0]
+    improved_run = [r for r in runs if r.data.params.get("n_estimators") == "200"][0]
+
+    # Register Baseline Run -> Version 1
+    mv1 = mlflow.register_model(f"runs:/{baseline_run.info.run_id}/model", MODEL_NAME)
+    print(f"Successfully registered Version {mv1.version} (Baseline).")
+
+    # Register Improved Run -> Version 2
+    mv2 = mlflow.register_model(f"runs:/{improved_run.info.run_id}/model", MODEL_NAME)
+    print(f"Successfully registered Version {mv2.version} (Improved).")
+
+    # Add model-level description
+    client.update_registered_model(name=MODEL_NAME, description=DESCRIPTION)
+    print("Updated model description.")
+
+    # Assign model aliases
+    client.set_registered_model_alias(MODEL_NAME, "challenger", mv1.version)
+    client.set_registered_model_alias(MODEL_NAME, "champion", mv2.version)
+    print("Set aliases: Version 1 -> 'challenger', Version 2 -> 'champion'.")
+
+if __name__ == "__main__":
+    register_fraud_models()
+
+
+Verification
+Opened Model registry → fraud-detector in the MLflow UI.
+
+Confirmed the top description displays "Fraud detection model for xFusionCorp transactions".
+
+Verified Version 1 links to the baseline run with alias challenger.
+
+Verified Version 2 links to the improved run with alias champion.
