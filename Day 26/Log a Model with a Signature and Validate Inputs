@@ -1,1 +1,107 @@
+# Day 026: Log a Model with a Signature and Validate Inputs
+
+## Overview
+This project demonstrates how to attach an **MLflow Model Signature** and an **Input Example** during model logging. Enforcing an input schema at serving boundaries ensures that malformed inference requests are rejected immediately with clear error messages, preventing silent failures in downstream MLOps pipelines.
+
+---
+
+## Technical Objectives
+
+- **Set Tracking Server:** Connect to the running MLflow tracking server at `http://localhost:5000`.
+- **Infer Model Signature:** Automatically derive the input/output schema from training data $X$ and model predictions $preds$ using `mlflow.models.infer_signature`.
+- **Log Artifact with Schema & Input Example:** Log the fitted estimator under the name `"model"` with the signature and example input dataframe attached.
+- **Validate Schema Enforcement:** Verify that runtime prediction with incomplete payloads (e.g., missing required columns) throws an `MlflowException`.
+
+---
+
+## File Structure
+
+```text
+/root/code/
+└── log_with_signature.py  # Main script for training, signature inferencing, and logging
+
+Implementation Details
+log_with_signature.py
+
+import numpy as np
+import pandas as pd
+import mlflow
+import mlflow.sklearn
+from mlflow.models import infer_signature
+from sklearn.dummy import DummyClassifier
+
+# 1. Connect to MLflow Tracking Server
+mlflow.set_tracking_uri("http://localhost:5000")
+
+# 2. Prepare synthetic dataset
+X = pd.DataFrame({
+    'amount': [10.5, 200.0, 50.0, 300.0, 15.0, 500.0],
+    'num_txn': [1, 5, 2, 8, 1, 10]
+})
+y = np.array([0, 1, 0, 1, 0, 1])
+
+# 3. Fit dummy model & generate predictions
+model = DummyClassifier(strategy="most_frequent")
+model.fit(X, y)
+preds = model.predict(X)
+
+# 4. Set MLflow experiment
+mlflow.set_experiment("fraud-signature")
+
+with mlflow.start_run():
+    # TODO 1: Infer model signature
+    signature = infer_signature(X, preds)
+
+    # TODO 2: Log model with signature and input_example
+    mlflow.sklearn.log_model(
+        model,
+        name="model",
+        signature=signature,
+        input_example=X
+    )
+
+print("model logged to the fraud-signature experiment")
+
+Execution & Verification Step-by-Step
+1. Confirm Tracking Server Connectivity
+Ensure the MLflow tracking server is active:
+
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5000/
+# Expected Output: 200
+
+2. Execute the Logging Script
+Run the script to train, infer signature, and log artifacts to MLflow:
+
+python3 /root/code/log_with_signature.py
+
+3. Verify Schema Enforcement
+Test runtime schema validation by attempting predictions with valid and malformed dataframes:
+
+python3 -c "
+import mlflow, pandas as pd
+from mlflow import MlflowClient
+
+mlflow.set_tracking_uri('http://localhost:5000')
+c = MlflowClient()
+exp = c.get_experiment_by_name('fraud-signature')
+run = c.search_runs([exp.experiment_id], order_by=['attributes.start_time DESC'], max_results=1)[0]
+m = mlflow.pyfunc.load_model('runs:/' + run.info.run_id + '/model')
+
+print('Signature Schema:', m.metadata.signature)
+
+# Valid payload containing all required columns
+print('Valid Request -> Result:', m.predict(pd.DataFrame({'amount': [10.0], 'num_txn': [2]})))
+
+# Invalid payload missing 'num_txn'
+try:
+    m.predict(pd.DataFrame({'amount': [10.0]}))
+    print('Invalid Request -> NOT Enforced')
+except Exception as e:
+    print('Invalid Request -> Rejected cleanly with:', type(e).__name__)
+"
+Expected Output
+Valid Request: Returns predictions successfully ([0]).
+
+Malformed Request: Raises MlflowException due to column standard schema enforcement.
+
 
