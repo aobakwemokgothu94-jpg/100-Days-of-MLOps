@@ -1,1 +1,38 @@
+# Fraud Detector Batch Prediction with Custom Preprocessing
 
+This repository contains the implementation of a batch-prediction wrapper for the `fraud-detector` champion model registered in MLflow. The pipeline incorporates per-column feature scaling before invoking the underlying ML model.
+
+---
+
+## Technical Overview
+
+The batch prediction script (`predict_with_preprocessing.py`) executes the following workflow:
+
+1. **Model Loading:** Connects to the local MLflow tracking server (`http://localhost:5000`) and retrieves the champion alias of the registered model (`models:/fraud-detector@champion`).
+2. **Preprocessing Calculation:** Reads synthetic numeric inputs from `/root/code/data/inputs.csv` and computes per-column statistics (mean and standard deviation). A zero-variance guard (`std == 0`) ensures numerical stability by replacing zero standard deviations with `1.0`.
+3. **PyFunc Wrapper (`ScaledPredictor`):** Applies standard scaling $\frac{X - \mu}{\sigma}$ to input features prior to passing them into `inner_model.predict()`.
+4. **Batch Execution & Export:** Appends model predictions as a new `prediction` column to the input dataset and saves the output to `/root/code/predictions.csv`.
+
+---
+
+## File Structure
+
+* `predict_with_preprocessing.py`: Main script containing `ScaledPredictor` class and inference execution logic.
+* `data/inputs.csv`: Synthetic 10-row input batch dataset.
+* `predictions.csv`: Output CSV file generated after running inference, containing input features along with the prediction column.
+
+---
+
+## Execution Instructions
+
+Ensure the MLflow tracking server is running on port 5000, then execute the prediction script:
+
+```bash
+python3 /root/code/predict_with_preprocessing.py
+
+erification
+Check that the output file is generated with 11 lines (1 header row + 10 data rows):
+
+Bash
+wc -l /root/code/predictions.csv
+head -n 5 /root/code/predictions.csv
