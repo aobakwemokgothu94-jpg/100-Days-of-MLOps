@@ -1,1 +1,100 @@
+Day 28: Fix a Broken MLflow Project and Re-Run It
+Overview
+The xFusionCorp Industries ML platform team packaged their training runs as MLflow Projects to enable reproducible execution via a single mlflow run command.
 
+During lab startup, an automated run was executed against the project staged at /root/code/trainer/ and failed. The initial run failed because the MLproject descriptor command line was improperly configured: it forwarded an incorrectly named flag (--n_est) and omitted several required parameters (--max_depth, --test_size, --random_seed) defined in train.py.
+
+This task involved updating /root/code/trainer/MLproject, verifying parameter passing to train.py, and executing two successful end-to-end MLflow project runs while preserving the original failed run for diagnostic tracking.
+
+Objectives
+Diagnose Initial Failure: Confirm that the initial automated run failed due to misaligned parameter flags between MLproject and train.py. Do not delete the original FAILED run.
+
+Fix MLproject:
+
+Align entry point arguments with train.py.
+
+Ensure all declared parameters (n_estimators, max_depth, test_size, random_seed) forward to train.py using authoritative flag names (--n_estimators, --max_depth, --test_size, --random_seed).
+
+Execute Project Runs:
+
+Run 1 (Default values): Execute mlflow run . -e train --env-manager=local using default parameters.
+
+Run 2 (Parameter Overrides): Execute mlflow run . -e train -P n_estimators=200 -P max_depth=10 --env-manager=local to pass explicit overrides.
+
+Verification:
+
+Confirm that the trainer experiment records two FINISHED runs alongside the original FAILED run.
+
+Validate parameter logging in MLflow UI across default and overridden runs.
+
+Technical Details & Files
+Location: /root/code/trainer/
+
+Files:
+
+MLproject: MLflow project descriptor defining entry points, parameters, and command execution.
+
+train.py: Trainer script using argparse to parse --n_estimators, --max_depth, --test_size, and --random_seed (must not be modified).
+
+Step-by-Step Implementation Guide
+Step 1: Inspect the Project Files
+Inspect the train.py argument parsing requirements and the initial MLproject definition:
+
+Bash
+cd /root/code/trainer
+cat train.py
+cat MLproject
+Initial MLproject Defect:
+The command: key was invoking python train.py --n_est {n_estimators}, which used an invalid flag name and omitted --max_depth, --test_size, and --random_seed.
+
+Step 2: Fix the MLproject Configuration
+Update /root/code/trainer/MLproject to pass all declared parameters with their exact argparse flag names:
+
+YAML
+name: trainer
+
+entry_points:
+  train:
+    parameters:
+      n_estimators:
+        type: int
+        default: 100
+      max_depth:
+        type: int
+        default: 5
+      test_size:
+        type: float
+        default: 0.2
+      random_seed:
+        type: int
+        default: 42
+    command: "python train.py --n_estimators {n_estimators} --max_depth {max_depth} --test_size {test_size} --random_seed {random_seed}"
+Step 3: Execute MLflow Runs
+Run the updated MLflow project entry point twice using --env-manager=local:
+
+1. Run with Default Parameters
+Bash
+mlflow run . -e train --env-manager=local
+Output: Succeeded with n_estimators=100, max_depth=5 (Run ID: b57bb2b57e7c457397a04bec27ae08f9).
+
+2. Run with Parameter Overrides
+Bash
+mlflow run . -e train -P n_estimators=200 -P max_depth=10 --env-manager=local
+Output: Succeeded with n_estimators=200, max_depth=10 (Run ID: 4a1bc785213c4511a475b14d088ff242).
+
+Verification & Results
+MLflow UI Check:
+
+Access the MLflow UI at http://localhost:5000/#/experiments/1.
+
+The trainer experiment contains:
+
+1 original FAILED run from startup (preserved for diagnosis).
+
+2 successful FINISHED runs.
+
+Parameter Log Verification:
+
+Default Run (b57bb2b57e7c457397a04bec27ae08f9): params.n_estimators = 100, params.max_depth = 5, params.test_size = 0.2, params.random_seed = 42.
+
+Override Run (4a1bc785213c4511a475b14d088ff242): params.n_estimators = 200, params.max_depth = 10, params.test_size = 0.2, params.random_seed = 42.
