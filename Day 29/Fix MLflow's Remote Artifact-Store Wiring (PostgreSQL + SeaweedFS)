@@ -1,1 +1,51 @@
+# MLflow Artifact Integration with SeaweedFS (S3-Compatible)
 
+## Overview
+The xFusionCorp Industries ML platform uses a shared MLflow Tracking Server backed by:
+- **Backend Store:** PostgreSQL container (`mlflow-db` on port `5432`) for run metadata.
+- **Artifact Store:** SeaweedFS (`S3 API` on port `8333` / `Filer UI` on port `8888`) for model artifact storage (`mlflow-artifacts` bucket).
+
+---
+
+## Issue Statement
+While MLflow correctly logged metadata to the PostgreSQL tracking store, model artifact uploads failed during client test runs (`log_test_run.py`). The SeaweedFS bucket (`mlflow-artifacts`) remained empty due to missing S3 endpoint routing in the server's environment configuration.
+
+---
+
+## Root Cause
+The MLflow Tracking Server startup script (`/root/code/start-mlflow.sh`) exported AWS credentials (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`) but lacked the custom S3 endpoint URL setting (`MLFLOW_S3_ENDPOINT_URL`). Without this, `boto3`/MLflow attempted to communicate with default AWS S3 endpoints instead of the local SeaweedFS S3 service running on `http://127.0.0.1:8333`.
+
+---
+
+## Solution & Implementation
+
+### 1. Update Startup Configuration
+Configured `/root/code/start-mlflow.sh` to export `MLFLOW_S3_ENDPOINT_URL` prior to starting the MLflow server process:
+
+```bash
+#!/bin/bash
+set -e
+
+# Configure SeaweedFS S3-compatible environment
+export AWS_ACCESS_KEY_ID="weedadmin"
+export AWS_SECRET_ACCESS_KEY="weedadmin123"
+export MLFLOW_S3_ENDPOINT_URL="[http://127.0.0.1:8333](http://127.0.0.1:8333)"
+
+# Launch MLflow Tracking Server
+exec mlflow server \
+  --backend-store-uri postgresql://mlflow:mlflow123@localhost:5432/mlflow \
+  --artifacts-destination s3://mlflow-artifacts \
+  --host 0.0.0.0 --port 5000 \
+  --allowed-hosts '*' --cors-allowed-origins '*'
+2. Restart Server & Execute Smoke Test
+Restarted the server process and ran the smoke test to verify end-to-end functionality:
+
+Bash
+/root/code/restart-mlflow.sh
+python3 /root/code/log_test_run.py
+Validation Results
+Client Execution: Running log_test_run.py completed successfully (test-remote run logged successfully) without raising S3/boto3 upload errors.
+
+Artifact Verification: Queried SeaweedFS Filer via http://127.0.0.1:8888/buckets/mlflow-artifacts/ and confirmed the experiment run folder (1/) holding serialized model files was created.
+
+Database Verification: Verified PostgreSQL metadata persistence by inspecting runs entries via docker exec mlflow-db psql -U mlflow -d mlflow -c "SELECT run_uuid, status, artifact_uri FROM runs;".
