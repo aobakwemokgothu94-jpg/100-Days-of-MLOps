@@ -1,1 +1,234 @@
+Fraud Detection Model Promotion & Serving Pipeline
 
+## Preview / Quick Summary
+
+This repository implements the automated promotion, serving, and monitoring pipeline for the `fraud-detection-v2` experiment:
+
+* **Promoted Model:** `fraud-detector-v2`
+* **Assigned Alias:** `@champion` (pointing to Run `983d3b0b66cc4f26b46e88ab967833d1` with top `f1_score: 0.92`)
+* **Live Endpoint:** `http://localhost:5001/health` (Served via MLflow Model Server using `--env-manager=local`)
+* **Health Check Script:** `/root/code/monitor.sh` (Returns exit status `0` on healthy probe)
+
+---
+
+## Overview
+
+The goal of this workflow is to systematically promote the best-performing candidate model from MLflow tracking to production inference and establish health monitoring.
+
+* **Tracking Server:** MLflow tracking server (`http://localhost:5000`) backed by PostgreSQL (`mlflow-db:5432`) and SeaweedFS S3 storage (`mlflow-artifacts`).
+* **Experiment Name:** `fraud-detection-v2`
+* **Registered Model:** `fraud-detector-v2`
+* **Serving Port:** `5001`
+* **Health Check Script:** `/root/code/monitor.sh`
+
+---
+
+## Pipeline Architecture & Flow
+
++-------------------+      Evaluates runs       +-----------------------+
+|  MLflow Tracking  | <------------------------ | Promotion Script      |
+|  (localhost:5000) |                           | (/tmp/promote.py)     |
++-------------------+                           +-----------------------+
+|                                                 |
+| Registers & aliases @champion                   |
+v                                                 v
++-------------------+      Serves Model         +-----------------------+
+|  Model Registry   | ------------------------> | MLflow Model Server   |
+| (fraud-detector)  |                           | (localhost:5001)      |
++-------------------+                           +-----------------------+
+^
+Health Probe               |
+/root/code/monitor.sh ----------------+
+
+
+---
+
+## Step-by-Step Implementation
+
+### 1. Model Evaluation & Promotion
+
+Evaluated candidate runs in the `fraud-detection-v2` experiment using the MLflow SDK, queried for the top `f1_score`, registered the model artifact as `fraud-detector-v2`, and assigned the `champion` alias to version `1`.
+
+```python
+import mlflow
+from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+# Fetch target experiment
+exp = client.get_experiment_by_name("fraud-detection-v2")
+
+# Retrieve top candidate sorted by f1_score
+runs = client.search_runs(
+    experiment_ids=[exp.experiment_id],
+    order_by=["metrics.f1_score DESC"],
+    max_results=1
+)
+top_run = runs[0]
+
+# Register top run and set alias
+model_uri = f"runs:/{top_run.info.run_id}/model"
+reg_model = mlflow.register_model(model_uri, "fraud-detector-v2")
+client.set_registered_model_alias(
+    name="fraud-detector-v2",
+    alias="champion",
+    version=reg_model.version
+)
+2. Model Serving
+Served the promoted champion version locally on port 5001 in the background:
+
+Bash
+export MLFLOW_TRACKING_URI="http://localhost:5000"
+
+nohup mlflow models serve \
+  -m "models:/fraud-detector-v2@champion" \
+  --port 5001 \
+  --host 0.0.0.0 \
+  --env-manager local > /tmp/mlflow_serve.log 2>&1 &
+3. Monitoring & Health Check
+Created /root/code/monitor.sh to probe the served endpoint and report health status.
+
+monitor.sh
+Bash
+#!/usr/bin/env bash
+
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/health)
+
+if [ "$HTTP_STATUS" -eq 200 ]; then
+    exit 0
+else
+    exit 1
+fi
+Make executable and run validation:
+
+Bash
+chmod +x /root/code/monitor.sh
+/root/code/monitor.sh && echo "Health check passed!"
+Verification Summary
+Check Point	Command / Metric	Expected Result	Status
+Top Run Metric	f1_score	0.92 (Run ID: 983d3b0b66cc4f26b46e88ab967833d1)	Passed
+Model Registry	fraud-detector-v2@champion	Points to Version 1	Passed
+Inference Server	curl -i http://localhost:5001/health	HTTP/1.1 200 OK	Passed
+Monitoring Script	/root/code/monitor.sh	Exit status 0	Passed
+
+---
+
+### Command to write directly to `/root/code/README.md`
+
+Run this block in your terminal to save the update:
+
+```bash
+cat << 'EOF' > /root/code/README.md
+# Fraud Detection Model Promotion & Serving Pipeline
+
+## Preview / Quick Summary
+
+This repository implements the automated promotion, serving, and monitoring pipeline for the `fraud-detection-v2` experiment:
+
+* **Promoted Model:** `fraud-detector-v2`
+* **Assigned Alias:** `@champion` (pointing to Run `983d3b0b66cc4f26b46e88ab967833d1` with top `f1_score: 0.92`)
+* **Live Endpoint:** `http://localhost:5001/health` (Served via MLflow Model Server using `--env-manager=local`)
+* **Health Check Script:** `/root/code/monitor.sh` (Returns exit status `0` on healthy probe)
+
+---
+
+## Overview
+
+The goal of this workflow is to systematically promote the best-performing candidate model from MLflow tracking to production inference and establish health monitoring.
+
+* **Tracking Server:** MLflow tracking server (`http://localhost:5000`) backed by PostgreSQL (`mlflow-db:5432`) and SeaweedFS S3 storage (`mlflow-artifacts`).
+* **Experiment Name:** `fraud-detection-v2`
+* **Registered Model:** `fraud-detector-v2`
+* **Serving Port:** `5001`
+* **Health Check Script:** `/root/code/monitor.sh`
+
+---
+
+## Pipeline Architecture & Flow
+
++-------------------+      Evaluates runs       +-----------------------+
+|  MLflow Tracking  | <------------------------ | Promotion Script      |
+|  (localhost:5000) |                           | (/tmp/promote.py)     |
++-------------------+                           +-----------------------+
+|                                                 |
+| Registers & aliases @champion                   |
+v                                                 v
++-------------------+      Serves Model         +-----------------------+
+|  Model Registry   | ------------------------> | MLflow Model Server   |
+| (fraud-detector)  |                           | (localhost:5001)      |
++-------------------+                           +-----------------------+
+^
+Health Probe               |
+/root/code/monitor.sh ----------------+
+
+
+---
+
+## Step-by-Step Implementation
+
+### 1. Model Evaluation & Promotion
+
+Evaluated candidate runs in the `fraud-detection-v2` experiment using the MLflow SDK, queried for the top `f1_score`, registered the model artifact as `fraud-detector-v2`, and assigned the `champion` alias to version `1`.
+
+```python
+import mlflow
+from mlflow.tracking import MlflowClient
+
+client = MlflowClient()
+
+# Fetch target experiment
+exp = client.get_experiment_by_name("fraud-detection-v2")
+
+# Retrieve top candidate sorted by f1_score
+runs = client.search_runs(
+    experiment_ids=[exp.experiment_id],
+    order_by=["metrics.f1_score DESC"],
+    max_results=1
+)
+top_run = runs[0]
+
+# Register top run and set alias
+model_uri = f"runs:/{top_run.info.run_id}/model"
+reg_model = mlflow.register_model(model_uri, "fraud-detector-v2")
+client.set_registered_model_alias(
+    name="fraud-detector-v2",
+    alias="champion",
+    version=reg_model.version
+)
+2. Model Serving
+Served the promoted champion version locally on port 5001 in the background:
+
+Bash
+export MLFLOW_TRACKING_URI="http://localhost:5000"
+
+nohup mlflow models serve \
+  -m "models:/fraud-detector-v2@champion" \
+  --port 5001 \
+  --host 0.0.0.0 \
+  --env-manager local > /tmp/mlflow_serve.log 2>&1 &
+3. Monitoring & Health Check
+Created /root/code/monitor.sh to probe the served endpoint and report health status.
+
+monitor.sh
+Bash
+#!/usr/bin/env bash
+
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/health)
+
+if [ "$HTTP_STATUS" -eq 200 ]; then
+    exit 0
+else
+    exit 1
+fi
+Make executable and run validation:
+
+Bash
+chmod +x /root/code/monitor.sh
+/root/code/monitor.sh && echo "Health check passed!"
+Verification Summary
+Check Point	Command / Metric	Expected Result	Status
+Top Run Metric	f1_score	0.92 (Run ID: 983d3b0b66cc4f26b46e88ab967833d1)	Passed
+Model Registry	fraud-detector-v2@champion	Points to Version 1	Passed
+Inference Server	curl -i http://localhost:5001/health	HTTP/1.1 200 OK	Passed
+Monitoring Script	/root/code/monitor.sh	Exit status 0	Passed
+EOF
