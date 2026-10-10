@@ -1,1 +1,77 @@
 
+# Fraud Detection: Config-Driven Model Training
+
+## Overview
+This project trains a machine learning model to detect fraudulent transactions using Python, scikit-learn, and MLflow. Training settings are stored in a YAML configuration file, making it easy to change model parameters without modifying the training script.
+
+## Dataset
+The dataset is stored in `data/train.csv` and contains the following columns:
+
+- `amount` — Transaction amount.
+- `hour` — Hour the transaction occurred.
+- `num_tx_past_day` — Number of transactions in the past day.
+- `is_fraud` — Target variable indicating whether a transaction is fraudulent.
+
+## Model Configuration
+The model is configured in `configs/train_config.yaml`.
+
+- **Model:** RandomForestClassifier
+- **Number of estimators:** 100
+- **Maximum depth:** 5
+- **Random state:** 42
+- **Target column:** `is_fraud`
+
+## Training
+The training script is located at `src/models/train.py`.
+
+Run training from the project root:
+
+```bash
+python src/models/train.py
+```
+
+The script loads the configuration, reads the training dataset, trains the model, evaluates its performance, saves the model, and logs parameters and metrics to MLflow.
+
+## Results
+
+The successful training run produced the following results:
+
+| Metric | Result |
+|---|---:|
+| Accuracy | 80.00% |
+| F1 Score | 82.61% |
+
+The trained model was saved to:
+
+`models/model.pkl`
+
+## MLflow Tracking
+
+MLflow is used to track the experiment, model parameters, and evaluation metrics.
+
+- **Experiment:** `fraud-detection`
+- **Model:** `RandomForestClassifier`
+- **Estimators:** 100
+- **Maximum depth:** 5
+- **Random state:** 42
+
+View the experiment:
+
+http://localhost:5000/#/experiments/1
+
+View the successful training run:
+
+http://localhost:5000/#/experiments/1/runs/24e596499b07484e972f06eb7e8dc35c
+
+## Expected Output
+
+```text
+accuracy=0.8000, f1_score=0.8261
+model saved to /root/code/fraud-detection/models/model.pkl
+```
+
+## Note
+The successful MLflow run required a runtime compatibility workaround to allow the scikit-learn decision tree type to be logged. The original `src/models/train.py` file was not modified.
+
+## Conclusion
+The configuration-driven training run completed successfully. The model was trained, evaluated, saved, and its parameters and metrics were recorded in MLflow.
