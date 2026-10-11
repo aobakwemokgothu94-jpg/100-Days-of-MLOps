@@ -1,1 +1,76 @@
+# xFusionCorp Industries ML Platform — Reproducibility & Audit Track
+
+This repository contains the deterministic training pipeline implementation for the **fraud-detection** platform. Identical code execution against identical data assets guarantees byte-identical logged artifacts, model parameters, and serialized performance metrics.
+
+---
+
+## 🏗️ Project Layout
+
+```text
+/root/code/fraud-detection/
+├── data/
+│   └── train.csv               # 200-row synthetic binary classification dataset
+├── models/
+│   └── model.pkl               # Local serialized binary of the trained estimator
+├── reports/
+│   ├── metrics_run_1.json      # Complete probe payload metrics for evaluation run 1
+│   ├── metrics_run_2.json      # Complete probe payload metrics for evaluation run 2
+│   └── metrics_run_3.json      # Complete probe payload metrics for evaluation run 3
+├── src/
+│   └── models/
+│       └── train.py            # Main training entry point (Deterministic Pipeline)
+└── check_determinism.sh        # Executable quality-gate verification probe
+```
+
+---
+
+## 🎯 Task Objective & Compliance
+
+The target objective mandates complete run-to-run determinism when analyzing data via the `RandomForestClassifier` pipeline. Compliance requires meeting the following strict criteria:
+
+1. **Byte-Identical Outputs:** All three adjacent execution outputs (`metrics_run_1.json`, `metrics_run_2.json`, and `metrics_run_3.json`) must be exactly matching on a file level.
+2. **Comprehensive Matching:** Reproducibility checks cover `accuracy`, `f1_score`, and structural array variations including `feature_importances`.
+3. **MLflow Integrity:** Active tracking runs must be properly isolated under the `fraud-detection-repro` experiment space.
+
+---
+
+## 🛠️ Implementation Strategy
+
+To secure determinism without triggering deprecation or serialization exceptions, the following engineering choices were applied:
+
+### Global Random State Anchorage
+The arbitrary initialization parameters for both the train-test split function and the ensemble tree estimator are anchored to a static seed environment:
+* `train_test_split(..., random_state=42)` prevents variable data partition shuffling.
+* `RandomForestClassifier(..., random_state=42)` enforces repeatable bootstrap feature bagging.
+
+### Serialization Bypass
+To mitigate the runtime security restrictions encountered during standard tree structure tracking validation, the MLflow artifact registration layer explicitly relies on classical pickling wrappers:
+```python
+mlflow.sklearn.log_model(model, name="model", serialization_format="pickle")
+```
+
+---
+
+## 🚀 Verification Guide
+
+Execute the determinism utility directly within the workspace terminal to trigger the verification harness:
+
+```bash
+# Navigate to project root
+cd /root/code/fraud-detection/
+
+# Trigger the evaluation pipeline probe
+./check_determinism.sh
+```
+
+### Expected Success Output
+```text
+=== running train.py (repro-run-1)
+repro-run-1: accuracy=0.8, f1_score=0.826087
+=== running train.py (repro-run-2)
+repro-run-2: accuracy=0.8, f1_score=0.826087
+=== running train.py (repro-run-3)
+repro-run-3: accuracy=0.8, f1_score=0.826087
+OK: all three runs produced byte-identical metrics.
+```
 
