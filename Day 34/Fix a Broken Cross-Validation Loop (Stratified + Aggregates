@@ -1,1 +1,124 @@
+# Fraud Detection - Stratified Cross-Validation with MLflow Tracking
 
+This repository contains an automated evaluation pipeline designed to benchmark machine learning fraud-detection candidates using **Stratified K-Fold Cross-Validation**. Every evaluation split is tracked independently in an MLflow tracking server using a **Parent-Child (Nested Run)** architecture to prevent UI dashboard clutter while maintaining deep metrics visibility.
+
+## 📌 Project Overview
+The core challenge in fraud detection modeling is handling highly imbalanced target datasets. To ensure reliable performance estimates, this script implements a 5-fold stratified splitter that preserves the balance of the target class (`roughly 70/30 split`) across all evaluation subsets. 
+
+Instead of aggregating results into a single average score upfront, **each fold is executed inside an isolated, nested MLflow run** to capture structural drift, performance variances, and potential model instability across splits.
+
+---
+
+## 📂 Repository Layout
+```text
+fraud-detection/
+├── data/
+│   └── train.csv            # 200-row synthetic highly imbalanced binary dataset
+├── reports/
+│   └── cv_results.json      # Structured summary output containing all 7 core metrics
+└── src/
+    └── models/
+        └── cross_validate.py # Core MLflow production execution script
+```
+
+---
+
+## ⚡ Core Features & Requirements Met
+
+* **Nested Run Layout:** Groups 5 independent evaluation cycles under a single master `cv-parent` run.
+* **Deterministic Class Ratios:** Implements `StratifiedKFold` to lock the target balance firmly across splits.
+* **Automated Metrics Engine:** Logs per-fold calculation metrics for `accuracy_score`, `f1_score`, and `roc_auc_score`.
+* **Zero Deflection Scaffold:** Runs strictly on native dependencies without custom helper imports or alteration of base configurations.
+
+---
+
+## 📊 Run Visualization Previews
+
+### 1. Terminal Execution Log
+When executed, the pipeline establishes connection with the local tracking server on port `5000` and displays real-time tracking hooks:
+
+```text
+root@controlplane ~/code # python3 /root/code/fraud-detection/src/models/cross_validate.py
+🏃 View run fold-1 at: http://localhost:5000/#/experiments/1/runs/cb6ef00bb7264e99a8df74528daff1c4
+🏃 View run fold-2 at: http://localhost:5000/#/experiments/1/runs/7806dc695ae844d68f2ae3310cf73eb5
+🏃 View run fold-3 at: http://localhost:5000/#/experiments/1/runs/114f6d7125014b139c07d6e4a6b045cd
+🏃 View run fold-4 at: http://localhost:5000/#/experiments/1/runs/912fb56aa35d447b9b7b1e6a8ddad0a7
+🏃 View run fold-5 at: http://localhost:5000/#/experiments/1/runs/ae016bc333eb4104873e72aea45ea648
+🏃 View run cv-parent at: http://localhost:5000/#/experiments/1/runs/aa09f690c43d4fce8895050b90afcf2a
+✅ Cross-validation complete. Summary metrics written to /root/code/fraud-detection/reports/cv_results.json
+```
+
+### 2. MLflow UI Parent-Child Hierarchy Preview
+In the MLflow dashboard, the experiment run expands into a clean, collapsible nested directory tree:
+
+```text
+Experiment: fraud-detection-cv
+└── 🔽 Run Name: cv-parent [Duration: 4s] [Metrics: mean_accuracy: 0.65, mean_f1: 0.382]
+    ├── 📄 Run Name: fold-1  [Metrics: accuracy: 0.675, f1: 0.580, roc_auc: 0.687]
+    ├── 📄 Run Name: fold-2  [Metrics: accuracy: 0.650, f1: 0.363, roc_auc: 0.630]
+    ├── 📄 Run Name: fold-3  [Metrics: accuracy: 0.650, f1: 0.300, roc_auc: 0.531]
+    ├── 📄 Run Name: fold-4  [Metrics: accuracy: 0.625, f1: 0.444, roc_auc: 0.569]
+    └── 📄 Run Name: fold-5  [Metrics: accuracy: 0.650, f1: 0.222, roc_auc: 0.626]
+```
+
+### 3. Generated Report Artifact (`reports/cv_results.json`)
+The final calculated performance profile containing exactly **7 top-level keys** and **4 per-fold variables**:
+
+```json
+{
+    "mean_accuracy": 0.65,
+    "std_accuracy": 0.01581138830084191,
+    "mean_f1": 0.3821896383186706,
+    "std_f1": 0.12324706109654288,
+    "mean_roc_auc": 0.6092846967846969,
+    "std_roc_auc": 0.053908461964929155,
+    "folds": [
+        {
+            "fold": 1,
+            "accuracy": 0.675,
+            "f1": 0.5806451612903226,
+            "roc_auc": 0.6875
+        },
+        {
+            "fold": 2,
+            "accuracy": 0.65,
+            "f1": 0.36363636363636365,
+            "roc_auc": 0.6309523809523809
+        },
+        {
+            "fold": 3,
+            "accuracy": 0.65,
+            "f1": 0.3,
+            "roc_auc": 0.53125
+        },
+        {
+            "fold": 4,
+            "accuracy": 0.625,
+            "f1": 0.4444444444444444,
+            "roc_auc": 0.5699404761904763
+        },
+        {
+            "fold": 5,
+            "accuracy": 0.65,
+            "f1": 0.2222222222222222,
+            "roc_auc": 0.6267806267806268
+        }
+    ]
+}
+```
+
+---
+
+## 🚀 Execution & Verification
+To manually execute the modeling evaluation cycle and review results, enter the following commands into your environment terminal:
+
+```bash
+# Force compile missing structural directories
+mkdir -p /root/code/fraud-detection/reports/
+
+# Execute ML pipeline runner
+python3 /root/code/fraud-detection/src/models/cross_validate.py
+
+# Verify schema output rules
+cat /root/code/fraud-detection/reports/cv_results.json
+```
