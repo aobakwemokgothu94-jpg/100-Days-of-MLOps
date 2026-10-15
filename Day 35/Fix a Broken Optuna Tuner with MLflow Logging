@@ -1,1 +1,194 @@
+# Fraud Detection Hyperparameter Tuning with Optuna and MLflow
+
+## Project Overview
+
+This project optimizes a Random Forest classifier for fraud detection using **Optuna** for hyperparameter tuning and **MLflow** for experiment tracking.
+
+The model is evaluated using stratified 3-fold cross-validation on a synthetic binary-classification dataset containing 200 rows. The objective is to maximize the F1 score while recording all 20 optimization trials in MLflow.
+
+## Objectives
+
+- Optimize Random Forest hyperparameters using Optuna.
+- Evaluate model performance using the F1 score.
+- Track every trial in the MLflow `hyperopt-tuning` experiment.
+- Compare experiment runs using the MLflow UI.
+- Save the best-performing hyperparameters to `configs/best_params.yaml`.
+
+## Technologies Used
+
+- Python
+- Optuna
+- MLflow
+- Pandas and NumPy
+- Scikit-learn
+- PyYAML
+
+## Dataset
+
+**Location:** `data/train.csv`
+
+- 200 synthetic records
+- Binary classification
+- Imbalanced fraud labels, approximately 70/30
+- Target column: `is_fraud`
+
+## Hyperparameter Search
+
+The tuner evaluates 20 trials using the following search space:
+
+| Hyperparameter | Type | Search Range |
+|---|---|---|
+| `n_estimators` | Integer | 50–500 |
+| `max_depth` | Integer | 3–20 |
+
+Each candidate is evaluated using stratified 3-fold cross-validation. The mean F1 score across the folds is used as the optimization objective.
+
+**Optimization direction:** Maximize F1 score.
+
+## Implementation Fixes
+
+### 1. MLflow Experiment Logging
+
+Each trial now creates an independent MLflow run and logs the required parameters and metric:
+
+- `params.n_estimators`
+- `params.max_depth`
+- `metrics.f1_score`
+
+The tracking server is configured at `http://localhost:5000`, and the experiment is named `hyperopt-tuning`.
+
+### 2. Optimization Direction
+
+The original study used `direction="minimize"`, which selected the lowest F1 score. It was changed to `direction="maximize"` so that Optuna selects the candidate with the highest F1 score.
+
+## Best Hyperparameters
+
+The completed search selected the following configuration:
+
+| Parameter | Best Value |
+|---|---:|
+| `n_estimators` | 244 |
+| `max_depth` | 17 |
+| Best F1 score | 0.471601 |
+| Valid MLflow runs | 20 |
+
+The configuration is saved in `configs/best_params.yaml`:
+
+```yaml
+max_depth: 17
+n_estimators: 244
+```
+
+These values correspond to the highest-F1 trial from the completed search.
+
+## Results Preview
+
+### Optimization Summary
+
+```text
+Experiment: hyperopt-tuning
+Optimization direction: maximize
+Total valid MLflow runs: 20
+Highest F1 score: 0.4716008367171158
+
+Best trial parameters:
+  n_estimators: 244
+  max_depth: 17
+
+SUCCESS: MLflow runs and best configuration verified.
+```
+
+### MLflow UI Preview
+
+Open the MLflow UI:
+
+http://localhost:5000
+
+Navigate to the `hyperopt-tuning` experiment to inspect the recorded runs. Use the Compare view to compare the hyperparameters and F1 scores across the 20 trials.
+
+Expected results:
+
+- 20 valid experiment runs
+- Both required hyperparameters logged for every run
+- An `f1_score` metric for every run
+- The best configuration saved to YAML
+
+## How to Run
+
+From the project directory:
+
+```bash
+cd /root/code/fraud-detection
+python src/models/tune.py
+```
+
+The script runs the optimization, logs the trials to MLflow, and writes the best hyperparameters to `configs/best_params.yaml`.
+
+## Verification
+
+Run the following command to verify the experiment and saved configuration:
+
+```bash
+python - <<'PY'
+import mlflow
+import yaml
+
+mlflow.set_tracking_uri("http://localhost:5000")
+client = mlflow.tracking.MlflowClient()
+
+experiment = client.get_experiment_by_name("hyperopt-tuning")
+assert experiment is not None, "Experiment not found"
+
+runs = client.search_runs(
+    [experiment.experiment_id],
+    max_results=1000
+)
+
+valid_runs = [
+    run for run in runs
+    if "n_estimators" in run.data.params
+    and "max_depth" in run.data.params
+    and "f1_score" in run.data.metrics
+]
+
+assert len(valid_runs) >= 20, "Fewer than 20 valid runs"
+
+best_run = max(
+    valid_runs,
+    key=lambda run: run.data.metrics["f1_score"]
+)
+
+with open("configs/best_params.yaml") as f:
+    saved_params = yaml.safe_load(f)
+
+expected_params = {
+    "n_estimators": int(best_run.data.params["n_estimators"]),
+    "max_depth": int(best_run.data.params["max_depth"])
+}
+
+assert saved_params == expected_params, (
+    "Saved YAML does not match the highest-F1 run"
+)
+
+print("Valid MLflow runs:", len(valid_runs))
+print("Highest F1:", best_run.data.metrics["f1_score"])
+print("Best parameters:", expected_params)
+print("SUCCESS: MLflow runs and best configuration verified.")
+PY
+```
+
+## Key Learnings
+
+- Using Optuna for automated hyperparameter optimization.
+- Selecting the correct optimization direction for an evaluation metric.
+- Logging trial parameters and metrics to MLflow.
+- Comparing experiment runs to identify the best-performing candidate.
+- Persisting model configuration in YAML.
+- Verifying that the saved configuration matches the best experiment result.
+
+## Conclusion
+
+The tuner now records all 20 trials in MLflow, optimizes for the highest F1 score, and saves the best-performing hyperparameters to YAML.
+
+This project demonstrates a reproducible workflow for hyperparameter tuning, experiment tracking, model evaluation, and configuration management.
 
