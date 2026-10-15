@@ -1,1 +1,108 @@
+# MLflow Model Bake-Off: Fraud Detection
+
+## Project Overview
+
+This project compares three machine learning models for fraud detection using MLflow experiment tracking. The goal is to identify the model with the highest F1 score and save the winning model's details to `reports/winner.json`.
+
+## Objectives
+
+- Train three candidate models: Random Forest, Gradient Boosting, and Logistic Regression.
+- Track model performance using MLflow.
+- Compare candidates using their F1 scores.
+- Automatically select the highest-performing model.
+- Save the winning model's type, MLflow run ID, and F1 score to a JSON report.
+- Verify that the report matches the best-performing MLflow run.
+
+## Models Evaluated
+
+1. **Random Forest**
+2. **Gradient Boosting**
+3. **Logistic Regression**
+
+## Technologies Used
+
+- Python
+- MLflow
+- Scikit-learn
+- JSON
+- Linux command line
+
+## Running the Project
+
+Navigate to the project directory:
+
+```bash
+cd /root/code/fraud-detection
+```
+
+Run each model training script:
+
+```bash
+python src/models/train_rf.py
+python src/models/train_gb.py
+python src/models/train_lr.py
+```
+
+Each script trains its respective model and records the performance metrics in the MLflow `bakeoff` experiment.
+
+Run the model selection script:
+
+```bash
+python src/models/bakeoff.py
+```
+
+The script selects the run with the highest F1 score and writes the result to:
+
+```text
+reports/winner.json
+```
+
+## Model Comparison Results
+
+The following results were recorded during the experiment:
+
+| Model | F1 Score | Ranking |
+|---|---:|---:|
+| Logistic Regression | 0.5192 | 1st |
+| Random Forest | 0.4533 | 2nd |
+| Gradient Boosting | 0.4076 | 3rd |
+
+**Winner: Logistic Regression**, with an F1 score of approximately `0.5192`.
+
+## Output Preview
+
+The generated `reports/winner.json` file contains:
+
+```json
+{
+  "model_type": "logistic_regression",
+  "run_id": "5b8b7dc6d4464345970d55ae560ae2a5",
+  "f1_score": 0.519208310283361
+}
+```
+
+### Output Fields
+
+- `model_type`: The winning model's candidate tag.
+- `run_id`: The unique MLflow identifier for the winning run.
+- `f1_score`: The winning run's F1 score.
+
+## Verification
+
+The output was verified against the recorded MLflow experiment runs.
+
+Verification confirmed that:
+
+- All three model families were found.
+- Logistic Regression achieved the highest F1 score.
+- The JSON report contains exactly the required three fields.
+- The reported model type, run ID, and F1 score match the highest-scoring MLflow run.
+
+**Verification result: SUCCESS**
+
+## Conclusion
+
+The bake-off successfully compared three fraud detection models using MLflow. Logistic Regression achieved the highest F1 score of `0.519208310283361` and was correctly selected as the winner. The results were saved to `reports/winner.json`, and the verification script confirmed that the report matches the MLflow experiment results.
+
+This project demonstrates model evaluation, experiment tracking, automated model selection, and JSON-based reporting in a machine learning workflow.
 
