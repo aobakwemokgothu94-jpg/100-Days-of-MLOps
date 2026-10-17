@@ -1,1 +1,57 @@
+Fraud Detection ML Pipeline
+Pipeline Passed
+Python
+Scikit-learn
+MLflow
 
+An end-to-end machine learning pipeline that preprocesses transaction data, engineers features, trains a Random Forest classifier, evaluates performance, and tracks the complete experiment with MLflow.
+
+Pipeline Architecture
+Raw Transaction Data
+200 rows
+Preprocessing
+Remove duplicates and transactions below 50
+Feature Engineering
+Create amount_log
+Model Training
+Random Forest classifier · 70/30 train-test split
+Model Evaluation
+Accuracy · F1 · ROC-AUC
+MLflow Tracking
+Parameters and metrics in one experiment run
+
+Evaluation Results
+Accuracy
+63.79%
+
+
+F1 Score
+46.15%
+
+
+ROC-AUC
+59.51%
+
+
+
+Verified data flow: 192 processed rows and 192 feature rows. The model and evaluation report were saved successfully.
+
+Copy-and-paste README
+Select and copy the entire Markdown below into your existing README.md.
+
+# Fraud Detection ML Pipeline
+
+An end-to-end machine learning pipeline for detecting potentially fraudulent transactions. This project demonstrates data preprocessing, feature engineering, model training, evaluation, and experiment tracking using Python, Scikit-learn, and MLflow.
+
+## Overview
+
+The pipeline runs four stages in sequence:
+
+1. **Preprocessing** — Removes duplicate records and transactions with an amount below 50.
+2. **Feature Engineering** — Creates an `amount_log` feature using `log1p(amount)`.
+3. **Model Training** — Trains a Random Forest classifier using the engineered features.
+4. **Model Evaluation** — Evaluates predictions on a held-out test set and saves the results as JSON.
+
+All four stages are orchestrated by `run_pipeline.py` and tracked within a single MLflow run.
+
+## Pipeline Architecture
