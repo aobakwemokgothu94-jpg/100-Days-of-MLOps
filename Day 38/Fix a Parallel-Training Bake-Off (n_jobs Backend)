@@ -1,1 +1,154 @@
+# MLflow Parallel Training Bake-Off
 
+## Project Overview
+
+This project evaluates the performance difference between serial and parallel training of a fraud-detection model using **Scikit-learn and MLflow**.
+
+The same `RandomForestClassifier` is trained twice: once using a single worker and once using all available CPU workers. MLflow tracks the training duration, worker configuration, and parallelization speedup for comparison.
+
+## Objectives
+
+- Compare serial and parallel model-training performance.
+- Configure `RandomForestClassifier` to use one worker or all available CPU workers.
+- Track experiment parameters and metrics with MLflow.
+- Calculate the speedup achieved through parallel training.
+- Save the trained model as a serialized pickle file.
+
+## Technologies Used
+
+- Python
+- Scikit-learn
+- MLflow
+- Pandas
+- Joblib
+
+## Project Configuration
+
+| Setting | Value |
+|---|---|
+| MLflow experiment | `parallel-training` |
+| MLflow tracking URI | `http://localhost:5000` |
+| Model | `RandomForestClassifier` |
+| Number of estimators | `200` |
+| Random state | `42` |
+| Serial workers | `n_jobs=1` |
+| Parallel workers | `n_jobs=-1` |
+| Training dataset | `data/train.csv` |
+| Saved model | `models/model.pkl` |
+
+## How It Works
+
+### 1. Serial Training
+
+The first training run uses `n_jobs=1`, restricting model training to a single worker.
+
+```python
+RandomForestClassifier(
+    n_estimators=200,
+    random_state=42,
+    n_jobs=1
+)
+```
+
+MLflow records the configuration and the measured training time.
+
+### 2. Parallel Training
+
+The second run uses `n_jobs=-1`, allowing Joblib and Scikit-learn to use all available CPU workers for supported parallel operations.
+
+```python
+RandomForestClassifier(
+    n_estimators=200,
+    random_state=42,
+    n_jobs=-1
+)
+```
+
+The resolved worker count is logged using Joblib's `effective_n_jobs()` function.
+
+### 3. Speedup Calculation
+
+The speedup is calculated by dividing the serial training time by the parallel training time.
+
+```python
+speedup = serial_time / parallel_time
+```
+
+A separate MLflow run named `speedup-summary` logs the resulting speedup and both training durations.
+
+## Results Preview
+
+The following results were recorded in MLflow during the experiment.
+
+| Metric | Serial | Parallel |
+|---|---:|---:|
+| `n_jobs` | `1` | `-1` |
+| `n_workers` | `1` | All resolved available workers |
+| `n_estimators` | `200` | `200` |
+| Training time | `0.5021 s` | `0.3153 s` |
+
+### Speedup Summary
+
+| Metric | Result |
+|---|---:|
+| Serial training time | `0.502064 s` |
+| Parallel training time | `0.315308 s` |
+| Speedup | `1.5923×` |
+| Approximate time reduction | `37.2%` |
+
+The parallel run completed training approximately **1.59 times faster** than the serial run in this measured execution.
+
+> Performance results depend on CPU availability, system load, and execution conditions. Parallel training is not guaranteed to be faster for every dataset or workload.
+
+## MLflow Experiment Tracking
+
+The `parallel-training` experiment contains three important runs:
+
+1. **serial** — logs `n_jobs=1`, worker count, and `training_time_seconds`.
+2. **parallel** — logs `n_jobs=-1`, worker count, and `training_time_seconds`.
+3. **speedup-summary** — logs the `speedup`, `serial_time_seconds`, and `parallel_time_seconds` metrics.
+
+Open the [MLflow experiment](http://localhost:5000/#/experiments/1) to inspect the runs and compare their parameters and metrics.
+
+## Model Persistence
+
+After training, the script saves the final trained model to:
+
+```text
+/root/code/fraud-detection/models/model.pkl
+```
+
+The model is serialized using Joblib and can be loaded later for inference.
+
+```python
+import joblib
+
+model = joblib.load("models/model.pkl")
+```
+
+## Running the Project
+
+From the project directory, execute:
+
+```bash
+cd /root/code/fraud-detection
+python src/models/train_parallel.py
+```
+
+Ensure the MLflow tracking server is running on port `5000` and that the training dataset is available before executing the script.
+
+## Verification Checklist
+
+- [x] Serial training run recorded in MLflow.
+- [x] Parallel training run recorded in MLflow.
+- [x] `n_jobs` distinguishes serial and parallel configurations.
+- [x] Worker-count parameter logged for both runs.
+- [x] Training duration logged for both runs.
+- [x] Speedup-summary run records the measured speedup.
+- [x] Trained model saved to `models/model.pkl`.
+
+## Conclusion
+
+This experiment demonstrates how to configure and evaluate serial versus parallel training with Scikit-learn, while using MLflow to track model-training performance. The recorded execution achieved a speedup of approximately **1.59×**, with training time decreasing from about `0.5021 seconds` to `0.3153 seconds`.
+
+The experiment provides a reproducible foundation for comparing training configurations and investigating how CPU parallelism affects machine-learning workloads.
