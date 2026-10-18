@@ -1,1 +1,270 @@
+# PyTorch Fraud Detection Training with Device Awareness and Checkpointing
 
+## Overview
+
+This task enhances the PyTorch training script for the xFusionCorp Industries ML platform team. The trainer is designed to run on available hardware, whether a CUDA-enabled GPU or a CPU-only environment.
+
+The implementation includes automatic device selection, accurate device logging in MLflow, per-epoch checkpointing, and model persistence.
+
+## Objectives
+
+- Automatically detect whether CUDA is available.
+- Use the GPU when available and fall back to the CPU otherwise.
+- Log the actual training device to MLflow.
+- Record the final training loss.
+- Save a model checkpoint after every epoch.
+- Save the trained model's state dictionary for later use.
+- Eliminate hardcoded CUDA operations that fail on CPU-only systems.
+
+## Technology Stack
+
+- **Python** — training script and automation
+- **PyTorch** — neural network, loss function, and optimisation
+- **Pandas** — CSV dataset loading
+- **MLflow** — experiment tracking, parameters, and metrics
+- **Adam optimiser** — model optimisation
+- **Binary cross-entropy loss** — binary classification objective
+
+## Project Structure
+
+```text
+/root/code/fraud-detection/
+├── data/
+│   └── train.csv
+├── src/
+│   └── models/
+│       └── train_pytorch.py
+├── models/
+│   └── fraud_model.pt
+└── checkpoints/
+    ├── ckpt_epoch_1.pt
+    ├── ckpt_epoch_2.pt
+    ├── ckpt_epoch_3.pt
+    ├── ckpt_epoch_4.pt
+    └── ckpt_epoch_5.pt
+```
+
+## Device-Aware Training
+
+The trainer detects the available device automatically:
+
+```python
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
+)
+```
+
+The model is moved to the selected device:
+
+```python
+model = Net().to(device)
+```
+
+Training inputs and labels are also moved to the same device:
+
+```python
+inputs = X.to(device)
+labels = y.to(device)
+```
+
+This ensures that the model and its input tensors use compatible devices.
+
+### Device Support
+
+| Environment | Selected device |
+|---|---|
+| CUDA GPU available | `cuda` |
+| No CUDA GPU available | `cpu` |
+
+The lab environment uses the CPU, so the verified MLflow run records `device=cpu`.
+
+## Neural Network Architecture
+
+The training script uses a compact, two-layer feedforward neural network:
+
+1. Input layer — accepts the dataset features.
+2. Hidden layer — 16 neurons with ReLU activation.
+3. Output layer — one neuron with sigmoid activation for binary classification.
+
+The model is trained using binary cross-entropy loss and the Adam optimiser with a learning rate of `0.01`.
+
+## MLflow Experiment Tracking
+
+The trainer uses the `pytorch-training` experiment.
+
+The tracking URI is configured as follows:
+
+```python
+mlflow.set_tracking_uri("http://localhost:5000")
+mlflow.set_experiment("pytorch-training")
+```
+
+The selected device is logged dynamically:
+
+```python
+mlflow.log_param("device", device.type)
+```
+
+The final loss is recorded after training:
+
+```python
+mlflow.log_metric("final_loss", loss.item())
+```
+
+### Verified MLflow Results
+
+| Field | Verified value |
+|---|---|
+| Experiment | `pytorch-training` |
+| Run status | `FINISHED` |
+| Device | `cpu` |
+| Final loss | `31.869705200195312` |
+| Epochs | 5 |
+
+Open the MLflow experiment at:
+
+[http://localhost:5000/#/experiments/1](http://localhost:5000/#/experiments/1)
+
+## Per-Epoch Checkpointing
+
+After each epoch, the trainer saves a checkpoint containing the epoch number, model state dictionary, and optimiser state dictionary.
+
+```python
+checkpoint_path = (
+    f"/root/code/fraud-detection/checkpoints/"
+    f"ckpt_epoch_{epoch + 1}.pt"
+)
+
+torch.save({
+    "epoch": epoch + 1,
+    "model_state_dict": model.state_dict(),
+    "optimizer_state_dict": optimizer.state_dict()
+}, checkpoint_path)
+```
+
+Five checkpoint files were generated successfully:
+
+- `ckpt_epoch_1.pt`
+- `ckpt_epoch_2.pt`
+- `ckpt_epoch_3.pt`
+- `ckpt_epoch_4.pt`
+- `ckpt_epoch_5.pt`
+
+### Resuming Training from a Checkpoint
+
+A saved checkpoint can be loaded to restore the model and optimiser:
+
+```python
+checkpoint = torch.load(
+    "/root/code/fraud-detection/checkpoints/ckpt_epoch_5.pt",
+    map_location=device,
+    weights_only=True
+)
+
+model.load_state_dict(checkpoint["model_state_dict"])
+optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+start_epoch = checkpoint["epoch"]
+```
+
+A resumed training loop should continue from `start_epoch`, with the remaining epochs configured appropriately.
+
+## Model Persistence
+
+After training, the model's state dictionary is saved to:
+
+```text
+/root/code/fraud-detection/models/fraud_model.pt
+```
+
+The model can later be recreated using the same network architecture and loaded with `load_state_dict()`.
+
+## How to Run
+
+Navigate to the project directory:
+
+```bash
+cd /root/code/fraud-detection
+```
+
+Run the training script:
+
+```bash
+python src/models/train_pytorch.py
+```
+
+The script trains the network for five epochs, saves a checkpoint after each epoch, records the training device and final loss in MLflow, and saves the final model state dictionary.
+
+## Verification Commands
+
+### Verify the saved model and checkpoints
+
+```bash
+ls -lh models/fraud_model.pt checkpoints/ckpt_epoch_*.pt
+```
+
+### Confirm there are five checkpoints
+
+```bash
+ls checkpoints/ckpt_epoch_*.pt | wc -l
+```
+
+Expected output:
+
+```text
+5
+```
+
+### Confirm there are no bare `.cuda()` calls
+
+```bash
+if grep -nE '\.cuda\(' src/models/train_pytorch.py; then
+    echo "FAIL: .cuda() found"
+else
+    echo "PASS: no .cuda() calls"
+fi
+```
+
+Verified output:
+
+```text
+PASS: no .cuda() calls
+```
+
+## Final Results
+
+The implementation meets the requested technical end state:
+
+- Device selection supports CUDA GPUs and CPU-only environments.
+- MLflow records the actual device used for training.
+- The `pytorch-training` experiment contains a finished run with `device=cpu` and `final_loss`.
+- The trained model is saved as `models/fraud_model.pt`.
+- Five per-epoch checkpoints are present.
+- Each checkpoint includes model and optimiser state dictionaries.
+- No bare `.cuda()` calls remain in the training script.
+
+## Conclusion
+
+The PyTorch fraud-detection trainer now supports automatic device selection, MLflow experiment tracking, and per-epoch checkpoint persistence. These improvements make training more portable across hardware environments and provide the state needed to resume interrupted training sessions.
+# PyTorch Fraud Detection Training
+
+Device-aware PyTorch training with MLflow tracking and resumable per-epoch checkpoints.
+
+## Run
+
+```bash
+cd /root/code/fraud-detection
+python src/models/train_pytorch.py
+```
+
+## Verified results
+
+- MLflow experiment: `pytorch-training`
+- Run status: `FINISHED`
+- Device: `cpu`
+- Final loss: `31.869705200195312`
+- Model: `models/fraud_model.pt`
+- Checkpoints: 5, each containing model and optimiser state dictionaries
+- No bare `.cuda()` calls remain.
+
+See the full README content above for architecture, checkpoint restoration, and verification commands.
