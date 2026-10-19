@@ -1,1 +1,222 @@
+# Task 40 — End-to-End Capstone: Fraud Detection ML Pipeline
+
+## 📌 Project Overview
+
+This project implements an end-to-end machine learning pipeline for fraud detection. It combines data validation, hyperparameter optimization, model selection, model registration, and automated report generation into a single reproducible workflow.
+
+The pipeline uses **MLflow** to track experiments and manage model versions, while **Optuna** is used to tune model hyperparameters.
+
+The objective is to automate the machine learning lifecycle, identify the best-performing fraud detection model using the F1 score, and register the selected model for staging.
+
+## 🎯 Objectives
+
+- Validate the input dataset before training.
+- Automate hyperparameter tuning using Optuna.
+- Track model training experiments and metrics in MLflow.
+- Select the best model using the F1 score.
+- Register the selected model in the MLflow Model Registry.
+- Assign the `staging` alias to the registered model.
+- Generate machine-readable JSON reports.
+- Verify the complete pipeline from beginning to end.
+
+## 🛠️ Technologies Used
+
+- **Python 3** — machine learning pipeline implementation
+- **Scikit-learn** — model training and evaluation
+- **Optuna** — hyperparameter optimization
+- **MLflow** — experiment tracking and model registry
+- **JSON** — report generation
+- **Make** — pipeline orchestration
+- **Linux CLI** — execution and verification
+
+## ⚙️ Pipeline Workflow
+
+The pipeline executes the following stages in order:
+
+1. **Data Validation:** Checks the dataset and confirms that the expected columns are available.
+2. **Hyperparameter Tuning:** Runs optimization trials to identify a suitable model configuration.
+3. **Model Selection:** Selects the best MLflow run based on the F1 score.
+4. **Model Registration:** Registers the selected fraud detection model in MLflow.
+5. **Alias Assignment:** Assigns the `staging` alias to the registered model version.
+6. **Report Generation:** Produces JSON reports containing the selected model, parameters, metrics, trial count, and validation status.
+7. **Final Verification:** Confirms that the reports exist and the model registry meets the required conditions.
+
+## ▶️ How to Run the Pipeline
+
+Navigate to the project directory:
+
+```bash
+cd /root/code/fraud-detection
+```
+
+Run the complete pipeline:
+
+```bash
+make train-pipeline
+```
+
+The Makefile orchestrates all pipeline stages in the correct order.
+
+## 📊 Model Training Results
+
+The completed pipeline produced the following results:
+
+| Metric | Result |
+|---|---|
+| Best model | RandomForest |
+| Number of trials | 11 |
+| F1 score | 0.4653417818740399 |
+| Number of estimators | 94 |
+| Maximum tree depth | 5 |
+| Data validation | OK |
+| MLflow experiment | `fraud-detection-tuning` |
+
+The RandomForest model was selected based on its recorded F1 score.
+
+> **Note:** The F1 score is the result of this training run, not a guarantee of production performance. Further evaluation on representative validation and test datasets may be required before deployment.
+
+## 🖼️ Project Previews
+
+### Preview 1 — Data Validation
+
+The validation stage completed successfully.
+
+```text
+[validate] {
+    'status': 'ok',
+    'rows': 200,
+    'columns': [
+        'amount',
+        'hour',
+        'num_tx_past_day',
+        'is_fraud'
+    ]
+}
+```
+
+**Result:** The pipeline validated 200 rows and confirmed the expected dataset columns.
+
+### Preview 2 — Hyperparameter Tuning
+
+Optuna completed the optimization process and identified a best-performing trial.
+
+```text
+best_value=0.4653
+best_params={
+    'model_type': 'RandomForest',
+    'n_estimators': 94,
+    'max_depth': 5
+}
+```
+
+**Result:** The selected configuration achieved an F1 score of approximately 0.4653.
+
+### Preview 3 — Model Selection
+
+```text
+[select] {
+    'run_id': 'ff411b69c5ce4750ad4651720f40a610',
+    'model_type': 'RandomForest',
+    'f1_score': 0.4653417818740399
+}
+```
+
+**Result:** The pipeline selected the RandomForest model using the F1 score.
+
+### Preview 4 — MLflow Model Registration
+
+```text
+Successfully registered model 'fraud-detector'.
+Created version '1' of model 'fraud-detector'.
+[register] fraud-detector v1 registered with alias 'staging'
+```
+
+**Result:** The model was registered successfully, and version 1 received the `staging` alias.
+
+### Preview 5 — Training Report
+
+File: `reports/training_report.json`
+
+```json
+{
+  "best_model": "RandomForest",
+  "best_params": {
+    "n_estimators": "94",
+    "max_depth": "5"
+  },
+  "metrics": {
+    "f1_score": 0.4653417818740399
+  },
+  "total_trials": 11,
+  "validation_status": "ok"
+}
+```
+
+**Result:** The report contains the selected model, best parameters, F1 score, trial count, and validation status.
+
+### Preview 6 — Final Verification
+
+```text
+===== REQUIRED REPORT FILES =====
+reports/selection.json
+reports/validation_status.json
+reports/training_report.json
+
+===== RELEASE CHECK =====
+PASS: report fields and values verified
+PASS: fraud-detector has a staging alias
+PASS: no production alias
+TOTAL TRIALS: 11
+BEST MODEL: RandomForest
+F1 SCORE: 0.4653417818740399
+```
+
+**Result:** All displayed final verification checks passed.
+
+## 📁 Generated Reports
+
+The pipeline generates the following reports:
+
+| File | Purpose |
+|---|---|
+| `reports/validation_status.json` | Records the data validation result |
+| `reports/selection.json` | Records the selected model and its run information |
+| `reports/training_report.json` | Summarizes model parameters, metrics, trial count, and validation status |
+
+## 🧪 Verification Commands
+
+Confirm that all required report files exist:
+
+```bash
+ls -l reports/validation_status.json \
+      reports/selection.json \
+      reports/training_report.json
+```
+
+Display the final training report:
+
+```bash
+cat reports/training_report.json
+```
+
+Inspect the MLflow experiment and its recorded runs through the MLflow tracking interface or client.
+
+The completed verification confirmed:
+
+- All required report files exist.
+- The training report contains the required fields.
+- The validation status is `ok`.
+- The trial count is greater than or equal to five.
+- The `fraud-detector` model has a `staging` alias.
+- No `production` alias is assigned.
+
+## 🏁 Conclusion
+
+Task 40 demonstrates a complete machine learning workflow for fraud detection, from data validation and automated hyperparameter tuning to model selection, MLflow registration, and report generation.
+
+The pipeline completed successfully, selected a RandomForest model with an F1 score of approximately **0.4653**, completed 11 trials, and passed the final report and model registry checks.
+
+This project demonstrates practical skills in machine learning automation, experiment tracking, model lifecycle management, reproducible workflows, and command-line verification.
+
+**Status: Completed and verified.**
 
