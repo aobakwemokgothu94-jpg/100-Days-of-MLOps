@@ -1,1 +1,56 @@
+# Feast Feature Store - xFusionCorp Industries Fraud Detection
 
+This repository contains the scaffolded Feast feature store repository and training pipelines for the xFusionCorp Industries fraud-detection workflow.
+
+## Project Structure
+
+```text
+/root/code/
+├── build_training_set.py             # Script to generate point-in-time training sets
+├── training_set.parquet              # Output training dataset
+└── feature_repo/
+    └── feature_repo/
+        ├── feature_store.yaml        # Feast project configuration (provider, registry, offline store)
+        ├── feature_definitions.py    # Starter feature definitions & views
+        ├── data/
+        │   ├── registry.db           # SQLite local registry generated via `feast apply`
+        │   └── driver_stats.parquet  # Parquet source data for driver statistics
+        └── __init__.py
+Quick Start Guide
+1. Initialize the Feature Repository
+If initializing from scratch:
+
+Bash
+cd /root/code/
+feast init feature_repo
+2. Apply Feature Definitions
+Apply the local feature definitions to populate the SQLite registry:
+
+Bash
+cd /root/code/feature_repo/feature_repo
+feast apply
+3. Build the Point-in-Time Training Set
+Run the pre-staged python script to retrieve historical features using a point-in-time join and save the output dataset:
+
+Bash
+python /root/code/build_training_set.py
+4. Run the Feast UI
+Start the web dashboard to inspect entities, feature views, and data sources:
+
+Bash
+cd /root/code/feature_repo/feature_repo
+feast ui &
+Access the dashboard locally at http://localhost:8888.
+
+
+---
+
+### Task Preview & Verification Summary
+
+| Component | Status | Details / Path |
+| :--- | :--- | :--- |
+| **Feast Initialization** | Completed | Scaffolded under `/root/code/feature_repo/` |
+| **Configuration (`feature_store.yaml`)** | Verified | Contains correct project (`feature_repo`), local SQLite registry, and offline parquet configurations |
+| **Registry (`registry.db`)** | Applied | Generated successfully at `/root/code/feature_repo/feature_repo/data/registry.db` via `feast apply` |
+| **Training Set Generation** | Completed | `/root/code/build_training_set.py` successfully executed using `store.get_historical_features(...)`, outputting `/root/code/training_set.parquet` |
+| **Feast UI Dashboard** | Running | Active via background Uvicorn server on port `8888`, displaying all 4 feature views, 2 entities, and 3 data sources under project `feature_repo` |
