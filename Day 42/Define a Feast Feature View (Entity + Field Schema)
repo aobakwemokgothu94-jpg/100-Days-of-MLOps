@@ -1,1 +1,165 @@
+# Feast Feature Store Configuration — Fraud Detection
 
+## Project Overview
+
+**Organization:** xFusionCorp Industries  
+**Project:** Fraud Detection  
+**Technology:** Feast Feature Store, Python, Parquet  
+**Repository:** `/root/code/fraud-detection/feature_repo/`  
+**Project Name:** `fraud_detection`
+
+## 1. Objective
+
+The objective of this task was to complete the unfinished Feast feature definitions for the fraud-detection platform, apply the changes to the feature registry, and verify the registered entity and feature-view schema in the Feast UI.
+
+The existing repository contained a Parquet data source, an incomplete customer entity join key, and a feature view with an unfinished schema.
+
+## 2. Requirements
+
+The task required the following changes:
+
+- Set the customer entity join key to `customer_id`.
+- Define the `amount` feature as `Float32`.
+- Define the `hour` feature as `Int64`.
+- Define the `num_tx_past_day` feature as `Int64`.
+- Exclude `is_fraud` from the served feature schema because it is a label.
+- Run `feast apply` to update the registry.
+- Verify the applied declarations using Python and the Feast UI.
+
+## 3. Implementation
+
+### Entity configuration
+
+The customer entity was updated to use the correct join key from the source data.
+
+```python
+customer = Entity(
+    name="customer",
+    join_keys=["customer_id"],
+    value_type=ValueType.INT64,
+    description="Customer identifier keyed by the transactions source.",
+)
+```
+
+The verified registry output confirmed that the entity join key is `customer_id`.
+
+### Feature-view configuration
+
+The `customer_transaction_features` feature view was configured to serve the three required features with their source-matching data types.
+
+```python
+schema=[
+    Field(name="amount", dtype=Float32),
+    Field(name="hour", dtype=Int64),
+    Field(name="num_tx_past_day", dtype=Int64),
+]
+```
+
+The `is_fraud` label was deliberately excluded.
+
+### Data source
+
+The feature view uses the existing Parquet source:
+
+`data/transactions.parquet`
+
+The source contains 200 synthetic rows and includes the `event_timestamp` column.
+
+## 4. Applying the Feast Registry
+
+The following commands were executed:
+
+```bash
+cd /root/code/fraud-detection/feature_repo
+feast apply
+```
+
+### Terminal preview — Registry application
+
+The command completed without an error. The output included the following updates:
+
+```text
+No project found in the repository. Using project name
+fraud_detection defined in feature_store.yaml
+
+Applying changes for project fraud_detection
+Updated entity customer
+Updated feature view customer_transaction_features
+
+No changes to infrastructure
+```
+
+The registry application updated the entity join key from `id` to `customer_id` and replaced the incomplete feature schema with the three required features.
+
+## 5. Verification Results
+
+The registry was verified using the Feast Python API.
+
+Command:
+
+```bash
+python - <<'PY'
+from feast import FeatureStore
+
+store = FeatureStore(repo_path=".")
+
+print("=== ENTITY ===")
+for entity in store.list_entities():
+    if entity.name == "customer":
+        print("Name:", entity.name)
+        print("Join key:", entity.join_key)
+
+print("\n=== FEATURE VIEW ===")
+for view in store.list_feature_views():
+    if view.name == "customer_transaction_features":
+        print("Name:", view.name)
+        for feature in view.features:
+            print(f"{feature.name}: {feature.dtype}")
+PY
+```
+
+### Terminal preview — Verified output
+
+```text
+=== ENTITY ===
+Name: customer
+Join key: customer_id
+
+=== FEATURE VIEW ===
+Name: customer_transaction_features
+amount: Float32
+hour: Int64
+num_tx_past_day: Int64
+```
+
+This output confirms that the registered entity and served feature schema match the task requirements.
+
+## 6. Feature Schema Summary
+
+| Object | Name | Expected value | Result |
+|---|---|---|---|
+| Entity | `customer` | Join key: `customer_id` | Verified |
+| Feature View | `customer_transaction_features` | Registered | Verified |
+| Feature | `amount` | `Float32` | Verified |
+| Feature | `hour` | `Int64` | Verified |
+| Feature | `num_tx_past_day` | `Int64` | Verified |
+| Label | `is_fraud` | Not served | Excluded from schema |
+
+## 7. Feast UI Preview
+
+The Feast UI was opened through the lab interface on port `8888`.
+
+The dashboard displayed the following project overview:
+
+```text
+Project: fraud_detection
+
+Feature Services: 0
+Feature Views:    1
+Entities:         2
+Data Sources:    1
+```
+
+The dashboard loaded successfully. The Python registry verification confirmed the exact entity join key and feature types.
+
+**UI
