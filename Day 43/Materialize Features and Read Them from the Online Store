@@ -1,1 +1,114 @@
+# Feast Feature Store — Incremental Materialization and Online Feature Retrieval
 
+## 1. Task Overview
+
+This task configures and validates a Feast feature store for a fraud-detection project. It covers incremental feature materialization, retrieval of online features, and validation of the generated JSON output.
+
+## 2. Objectives
+
+- Configure the Feast feature store and customer entity.
+- Materialize feature data into the SQLite online store.
+- Retrieve customer features using `get_online_features()`.
+- Save retrieved features to `online_features.json`.
+- Verify that the online store is populated and the JSON output is valid.
+
+## 3. Project Structure
+
+```text
+feature_repo/
+├── data/
+│   ├── transactions.parquet
+│   ├── registry.db
+│   └── online_store.db
+├── features.py
+├── feature_store.yaml
+├── materialize.sh
+├── fetch_features.py
+└── online_features.json
+```
+
+*Note: This shows the relevant files used in the task; it is not an exhaustive directory listing.*
+
+## 4. Incremental Materialization
+
+The `materialize.sh` script uses the following configuration:
+
+```bash
+#!/bin/bash
+set -e
+END_DATE="2025-01-01T00:00:00"
+feast materialize-incremental "$END_DATE"
+```
+
+The script invokes Feast's incremental materialization command with an ISO-8601 end date.
+
+Run it using:
+
+```bash
+cd /root/code/fraud-detection/feature_repo
+chmod +x materialize.sh
+./materialize.sh
+```
+
+## 5. Online Feature Retrieval
+
+The `fetch_features.py` script retrieves customer features from the online store and writes the results to `online_features.json`.
+
+The retrieved feature fields include:
+
+- `customer_id`
+- `amount`
+- `hour`
+- `num_tx_past_day`
+
+The script also checks for non-null `amount` values and reports a successful validation when one is found.
+
+Run it using:
+
+```bash
+python3 fetch_features.py
+```
+
+## 6. Execution Preview
+
+The following output was observed during feature retrieval:
+
+```text
+customer_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+amount:
+[822.4299926757812, 802.9400024414062, 214.6199951171875,
+ 222.44000244140625, 868.530029296875, 822.219970703125,
+ 318.29998779296875, 191.0399932861328, 629.6799926757812,
+ 441.32000732421875]
+
+num_tx_past_day: [1, 0, 2, 2, 5, 5, 5, 5, 1, 3]
+
+hour: [2, 19, 4, 1, 0, 17, 15, 2, 5, 8]
+
+PASS: customer_id=1, amount=822.4299926757812
+PASS: JSON output exists
+Online store size: 16384 bytes
+```
+
+## 7. Final Validation Results
+
+The following checks were completed successfully:
+
+| Validation | Observed result |
+|---|---|
+| Online-store table | 60 rows |
+| Online-store database size | 16 KB |
+| JSON output file | 707 bytes |
+| JSON syntax validation | PASS: Valid JSON |
+| Non-null customer amount | PASS |
+| Python entry-point guard | Present |
+| Incremental materialization command | Present in `materialize.sh` |
+
+The online-store row count and database size were verified using SQLite and filesystem commands. The JSON output was validated using Python's JSON parser.
+
+## 8. Conclusion
+
+The Feast feature-store task demonstrates incremental materialization configuration and successful retrieval of customer features from the SQLite online store. The generated JSON file is valid, and the retrieved data includes non-null customer transaction amounts.
+
+The recorded checks support the successful completion of the core feature-store retrieval requirements. The observed database row count confirms that the online store contains feature records; it does not independently establish how many records were written by the most recent incremental run.
