@@ -1,1 +1,160 @@
+# Vault AppRole Authentication and MLflow Startup
 
+## 1. Task Overview
+
+The objective of this task was to correct Vault's `mlflow-reader` policy, enable AppRole authentication, and create an AppRole named `mlflow` bound to that policy. These changes allow the MLflow wrapper to authenticate with Vault and access the required KV v2 secret.
+
+The final requirement was to confirm that the MLflow tracking server responds successfully on port `5000`.
+
+## 2. Environment
+
+| Component | Configuration |
+|---|---|
+| Vault address | `http://127.0.0.1:8200` |
+| Vault UI port | `8200` |
+| MLflow port | `5000` |
+| Policy name | `mlflow-reader` |
+| KV v2 API path | `secret/data/mlflow` |
+| Authentication method | AppRole |
+| AppRole name | `mlflow` |
+| Policy capability | `read` |
+
+## 3. Configure Vault CLI Access
+
+The Vault CLI was configured to use the lab's HTTP endpoint and the existing root token file.
+
+```bash
+export VAULT_ADDR="http://127.0.0.1:8200"
+export VAULT_TOKEN="$(cat /root/code/vault-root-token)"
+```
+
+This resolved the initial HTTPS-versus-HTTP connection error.
+
+## 4. Correct the `mlflow-reader` Policy
+
+The existing policy was updated to grant read access to the KV v2 API data path `secret/data/mlflow`.
+
+```bash
+vault policy write mlflow-reader - <<'EOF'
+path "secret/data/mlflow" {
+  capabilities = ["read"]
+}
+EOF
+```
+
+### Preview: Actual Terminal Output
+
+```text
+Success! Uploaded policy: mlflow-reader
+```
+
+The policy name was preserved, and the policy was updated successfully.
+
+### Verify the Policy
+
+```bash
+vault policy read mlflow-reader
+```
+
+Expected policy content:
+
+```hcl
+path "secret/data/mlflow" {
+  capabilities = ["read"]
+}
+```
+
+## 5. Enable AppRole Authentication
+
+AppRole was enabled so that the MLflow wrapper could authenticate as a machine identity instead of relying on a static root token.
+
+```bash
+vault auth enable approle
+```
+
+### Preview: Actual Terminal Output
+
+```text
+Success! Enabled approle auth method at: approle/
+```
+
+## 6. Create the MLflow AppRole
+
+The `mlflow` role was created and associated with the `mlflow-reader` policy.
+
+```bash
+vault write auth/approle/role/mlflow \
+  token_policies="mlflow-reader" \
+  token_ttl="1h" \
+  token_max_ttl="4h"
+```
+
+### Preview: Actual Terminal Output
+
+```text
+Success! Data written to: auth/approle/role/mlflow
+```
+
+### Verify the Role
+
+```bash
+vault read auth/approle/role/mlflow
+```
+
+### Preview: Actual Role Configuration
+
+```text
+Key                        Value
+---                        -----
+alias_metadata             map[]
+bind_secret_id             true
+local_secret_ids           false
+secret_id_bound_cidrs      <nil>
+secret_id_num_uses         0
+secret_id_ttl              0s
+token_bound_cidrs          []
+token_explicit_max_ttl     0s
+token_max_ttl               4h
+token_no_default_policy    false
+token_num_uses             0
+token_period               0s
+token_policies             [mlflow-reader]
+token_ttl                  1h
+token_type                 default
+```
+
+The output confirms that the role exists and includes `mlflow-reader` in its token policies.
+
+## 7. Check MLflow Startup
+
+After the Vault policy and AppRole changes, the wrapper log showed MLflow starting and completing application startup.
+
+Command used:
+
+```bash
+tail -n 40 /var/log/mlflow-wrapper.log
+```
+
+### Preview: Relevant Log Output
+
+```text
+INFO: Uvicorn running on http://0.0.
+Quick preview of your strongest evidence
+Vault policy and authentication
+
+Policy upload succeeded and AppRole was enabled.
+
+Success! Uploaded policy: mlflow-reader
+Success! Enabled approle auth method at: approle/
+
+
+
+Role binding
+
+token_policies             [mlflow-reader]
+
+
+
+MLflow service response
+HTTP 200
+The endpoint responded successfully on port 5000.
