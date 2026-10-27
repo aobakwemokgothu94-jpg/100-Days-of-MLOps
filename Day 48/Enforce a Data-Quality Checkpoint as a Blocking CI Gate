@@ -1,1 +1,161 @@
+# Enforce the Data-Quality Checkpoint as a CI Gate
+
+## 1. Project Overview
+
+This task implements an automated data-quality gate in the `fraud-detector` repository using Gitea Actions and Great Expectations.
+
+The objective was to ensure that the data-quality checkpoint runs automatically during pull-request validation. If the checkpoint fails, the workflow must return a non-zero exit code and fail the CI job, preventing a pull request from passing its required data-quality check.
+
+## 2. Task Objectives
+
+- Integrate the existing `drift_check` checkpoint into the CI workflow.
+- Execute the checkpoint automatically for pull requests targeting `main`.
+- Make checkpoint failures block the workflow.
+- Verify that valid data passes the checkpoint.
+- Avoid configurations that suppress validation failures.
+
+## 3. Environment and Tools
+
+| Component | Details |
+|---|---|
+| Repository | `fraud-detector` |
+| Git platform | Gitea |
+| Workflow | Gitea Actions |
+| Validation framework | Great Expectations |
+| Supporting libraries | pandas, NumPy |
+| Python module | `src.gx_run` |
+| Checkpoint | `drift_check` |
+| Working branch | `enforce-data-quality-gate` |
+| Target branch | `main` |
+
+## 4. Implementation
+
+The CI workflow is located at:
+
+`.gitea/workflows/data-quality.yml`
+
+The workflow installs the required Python packages and runs the existing checkpoint through the `src.gx_run` module.
+
+### Workflow Preview
+
+The following is the data-quality gate step added to the workflow:
+
+```yaml
+- name: Run drift_check checkpoint
+  run: python3 -m src.gx_run
+```
+
+This step is placed under the `steps` section of the `data-quality` job, after the dependency installation step.
+
+### Why This Works
+
+The workflow executes the checkpoint as a normal CI step. If `src.gx_run` exits with a non-zero status, the step fails and the job is marked as failed.
+
+The command does not use `continue-on-error: true`, `|| true`, or `; true` to hide validation failures. Consequently, a failed checkpoint cannot be reported as a successful job simply because its exit status was ignored.
+
+## 5. Validation and Testing
+
+The checkpoint was executed locally using:
+
+```bash
+python3 -m src.gx_run
+```
+
+### Successful Output Preview
+
+```text
+Calculating Metrics: 100%
+Checkpoint drift_check success=True
+```
+
+This output confirms that the checkpoint completed successfully against the available dataset.
+
+The workflow change was also checked for whitespace errors:
+
+```bash
+git diff --check
+```
+
+The check completed without reported errors.
+
+## 6. Git Commit and Push
+
+The change was committed and pushed to the existing feature branch.
+
+**Commit message:**
+
+```text
+Enforce data quality checkpoint in CI
+```
+
+**Commit ID:**
+
+```text
+081de50efe
+```
+
+**Branch:**
+
+```text
+enforce-data-quality-gate
+```
+
+The branch was pushed to the Gitea repository, updating the existing pull request.
+
+## 7. Pull Request and CI Results
+
+**Pull request:** Enforce the data-quality checkpoint as a CI gate — #1
+
+**Repository:** `gitea-admin/fraud-detector`
+
+**Pull request URL:**
+
+http://localhost:3000/gitea-admin/fraud-detector/pulls/1
+
+### Confirmed Results
+
+```text
+All checks were successful
+
+Data Quality / data-quality (pull_request)
+Successful in 10s
+
+This pull request can be merged automatically.
+```
+
+These results confirm that the pull-request workflow ran successfully and that Gitea reported the data-quality CI check as successful.
+
+## 8. Expected Failure Behaviour
+
+When the checkpoint detects invalid data and exits with a non-zero status, the ordinary workflow step should fail. This causes the `data-quality` job to fail rather than allowing the validation error to be ignored.
+
+The successful CI result confirms the clean-data path. A separate deliberately corrupted-data test should be performed if explicit evidence of the failure path is required.
+
+## 9. Evidence and Previews
+
+The following evidence is available from the completed task:
+
+1. **Workflow configuration:** The `Run drift_check checkpoint` step in `.gitea/workflows/data-quality.yml`.
+2. **Local checkpoint execution:** `Checkpoint drift_check success=True`.
+3. **Git commit:** Commit `081de50efe`.
+4. **Gitea pull request:** PR #1 showing the successful `Data Quality / data-quality (pull_request)` check.
+5. **Merge readiness:** Gitea reports that the pull request can be merged automatically.
+
+## 10. Skills Demonstrated
+
+- CI/CD workflow configuration
+- Automated data-quality validation
+- Great Expectations checkpoint execution
+- Python module execution in CI
+- Git branching, committing, and pushing
+- Pull-request verification in Gitea
+- Fail-fast validation and merge-gate design
+
+## 11. Conclusion
+
+The data-quality checkpoint was integrated into the Gitea Actions workflow as a blocking CI step. The checkpoint passed locally, the workflow changes were committed and pushed, and the existing pull request reported a successful CI check.
+
+The implementation is designed to fail the job when the checkpoint returns a non-zero exit status, helping prevent changes with failing data-quality validation from passing the CI gate.
+
+**Task status:** Implementation complete; pull-request CI check successful.
 
