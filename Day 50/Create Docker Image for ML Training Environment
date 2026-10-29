@@ -1,1 +1,165 @@
+# xFusionCorp Industries — ML Training Docker Environment
 
+## Project Overview
+
+This task involved completing the Dockerfile for the fraud-detection training environment. The objective was to create a consistent Python environment, install all required dependencies, copy the existing training script into the image, and configure the default command to execute the training process.
+
+The existing `train.py` file was preserved without modification. Only the Dockerfile was authored.
+
+## Objectives
+
+- Use `python:3.11-slim` as the base image.
+- Set `/app` as the working directory.
+- Install all Python packages required by the training script.
+- Copy `train.py` into the Docker image.
+- Configure the container to run the training script by default.
+- Build and verify the `ml-trainer:v1` Docker image.
+- Confirm that all required Python imports resolve successfully.
+
+## Dockerfile Implementation
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir scikit-learn pandas numpy joblib
+
+COPY train.py .
+
+CMD ["python3", "train.py"]
+```
+
+### Dockerfile Explanation
+
+| Instruction | Purpose |
+|---|---|
+| `FROM python:3.11-slim` | Uses the Python 3.11 slim base image. |
+| `WORKDIR /app` | Sets the working directory inside the container. |
+| `RUN pip install --no-cache-dir scikit-learn pandas numpy joblib` | Installs the required Python dependencies. |
+| `COPY train.py .` | Copies the existing training script into `/app`. |
+| `CMD ["python3", "train.py"]` | Runs the training script when the container starts without an overriding command. |
+
+## Project Structure
+
+```text
+/root/code/ml-docker/
+├── Dockerfile
+└── train.py
+```
+
+## Build and Verification Commands
+
+### 1. Navigate to the project directory
+
+```bash
+cd /root/code/ml-docker
+```
+
+### 2. Build the Docker image
+
+```bash
+docker build -t ml-trainer:v1 .
+```
+
+**Observed result:** The build completed successfully, and Docker created the `ml-trainer:v1` image.
+
+### 3. Verify the image
+
+```bash
+docker images ml-trainer:v1
+```
+
+**Observed output:**
+
+```text
+IMAGE          ID             DISK USAGE   CONTENT SIZE
+ml-trainer:v1   9b117d292af7   691MB        157MB
+```
+
+### 4. Verify Python dependencies
+
+```bash
+docker run --rm ml-trainer:v1 python3 -c "import sklearn, pandas, numpy, joblib; print('OK')"
+```
+
+**Observed output:**
+
+```text
+OK
+```
+
+This confirms that all four required Python imports succeeded inside the container.
+
+### 5. Execute the training script
+
+```bash
+docker run --rm ml-trainer:v1
+```
+
+**Observed output:**
+
+```text
+Accuracy: 1.0000
+F1 Score: 1.0000
+Model saved to /app/model.pkl
+```
+
+The training script executed and reported its accuracy and F1 score. It also reported saving the trained model to `/app/model.pkl` inside the container.
+
+## Previews and Evidence
+
+### Preview 1 — Dockerfile
+
+The Dockerfile contains all five required instructions: base image, working directory, dependency installation, source-code copy, and default command.
+
+### Preview 2 — Docker Image
+
+The `docker images ml-trainer:v1` command confirmed that the image was created and was available locally.
+
+### Preview 3 — Dependency Check
+
+The import test printed `OK`, confirming successful imports of scikit-learn, pandas, NumPy, and joblib.
+
+### Preview 4 — Training Execution
+
+The training run reported:
+
+- Accuracy: `1.0000`
+- F1 Score: `1.0000`
+- Model output path: `/app/model.pkl`
+
+These are the results reported by the provided synthetic training script. They do not establish performance on unseen or real-world fraud data.
+
+## Results Summary
+
+| Requirement | Result |
+|---|---|
+| Python 3.11 slim base image | Passed |
+| Working directory set to `/app` | Passed |
+| Required dependencies installed | Passed |
+| `train.py` copied into the image | Passed |
+| Default training command configured | Passed |
+| Docker image built successfully | Passed |
+| Image listed by Docker | Passed |
+| Python import verification | Passed |
+| Training script execution | Passed |
+
+## Conclusion
+
+The Dockerfile was completed according to the specified team standards. The image `ml-trainer:v1` built successfully, all required Python imports were verified, and the training script executed successfully.
+
+The task's required build and verification checks passed based on the captured terminal output.
+
+**Note:** The container was launched with `--rm`, so the container was removed after execution. The reported model file at `/app/model.pkl` was inside that container and was not automatically retained on the host.
+
+## Technologies Used
+
+- Docker
+- Python 3.11
+- scikit-learn
+- pandas
+- NumPy
+- joblib
+
+**Task status: Completed and verified.**
