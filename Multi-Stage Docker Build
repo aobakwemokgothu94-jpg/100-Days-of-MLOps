@@ -1,0 +1,51 @@
+# ML Serve - Multi-Stage Docker Build
+
+This project packages a trained fraud-detection machine learning model and a Flask serving application using an optimized multi-stage Docker build.
+
+## Project Structure
+
+* **`train_model.py`**: Fits a 10-tree `RandomForest` on a synthetic fraud dataset and saves the trained model artifact to `/app/model.pkl` using `joblib`.
+* **`serve.py`**: A Flask web application that loads the trained model and exposes:
+  * `POST /predict`: For running inference.
+  * `GET /health`: For checking service status.
+* **`Dockerfile`**: A multi-stage build configuration that separates heavy training dependencies and source files from the lightweight serving runtime.
+
+---
+
+## Getting Started
+
+### 1. Build the Docker Image
+Run the following command from the project root directory to build the multi-stage container image:
+
+```bash
+docker build -t ml-serve:v1 .
+2. Verify the Image
+Confirm that the image was built successfully:
+
+Bash
+docker images ml-serve:v1
+3. Run the Container
+Start the container in detached mode and map port 8090 on your host to port 8080 in the container:
+
+Bash
+docker run -d --name ml-serve-app --rm -p 8090:8080 ml-serve:v1
+4. Test the Health Endpoint
+Verify that the service is running properly by querying the health endpoint:
+
+Bash
+curl http://localhost:8090/health
+Expected Response:
+
+JSON
+{"status": "ok"}
+5. Stop the Container
+When you are done testing, stop the running container:
+
+Bash
+docker stop ml-serve-app
+Why Multi-Stage Builds?
+By using a multi-stage Docker build:
+
+Builder Stage: Installs all required packages (including training dependencies like pandas), copies source code, and executes train_model.py to generate model.pkl.
+
+Runtime Stage: Starts from a clean base image, installs only the necessary serving packages (flask, joblib, numpy, scikit-learn), and copies over the pre-compiled model.pkl and serve.py.
