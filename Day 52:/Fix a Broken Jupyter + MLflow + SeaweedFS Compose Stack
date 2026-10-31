@@ -1,0 +1,65 @@
+# xFusionCorp Industries — ML Development Stack
+
+## Project Overview
+
+This project involved troubleshooting and correcting a Docker Compose configuration for the xFusionCorp Industries Machine Learning (ML) development environment.
+
+The environment consists of three services deployed through Docker Compose:
+
+- **Jupyter Lab** — Interactive notebook development.
+- **MLflow** — Machine learning experiment tracking and model management.
+- **SeaweedFS** — S3-compatible artifact storage and Filer web interface.
+
+The original `docker-compose.yml` contained incorrect SeaweedFS port mappings and did not explicitly disable Jupyter token authentication.
+
+The objective was to correct the configuration and make all three browser-based interfaces accessible through their required standard host ports without login prompts.
+
+## Objectives
+
+1. Inspect the existing Docker Compose configuration.
+2. Correct Jupyter authentication settings.
+3. Configure the MLflow service to expose its web interface.
+4. Correct SeaweedFS S3 API and Filer UI port mappings.
+5. Start all three services.
+6. Verify container health and browser accessibility using `curl`.
+
+## Environment and Technologies
+
+| Component | Configuration |
+|---|---|
+| Container orchestration | Docker Compose |
+| Jupyter image | `jupyter/base-notebook:python-3.11` |
+| MLflow image | `ghcr.io/mlflow/mlflow:v3.14.0` |
+| SeaweedFS image | `chrislusf/seaweedfs:4.48` |
+| Jupyter host port | 8888 |
+| MLflow host port | 5000 |
+| SeaweedFS S3 host port | 9000 |
+| SeaweedFS Filer host port | 9001 |
+
+## Project Location
+
+```text
+/root/code/ml-dev/
+```
+
+Main configuration file:
+
+```text
+docker-compose.yml
+```
+
+## Configuration Corrections
+
+### 1. Jupyter Lab
+
+Configured Jupyter to run without token authentication:
+
+```yaml
+command:
+  - start-notebook.py
+  - --ServerApp.token=
+```
+
+Port mapping:
+
+```yaml
