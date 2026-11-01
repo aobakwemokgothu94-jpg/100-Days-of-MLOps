@@ -1,0 +1,187 @@
+# PyTorch CPU-Only Docker Image – Docker Lab
+
+## Project Overview
+
+This project focuses on building and running a CPU-compatible Docker image for the xFusionCorp Industries ML platform team.
+
+The provided Dockerfile contained an incorrect PyTorch package index targeting GPU wheels and a default command that required CUDA availability. Since the lab environment provides CPU-only hardware, these settings prevented the container from meeting the required specifications.
+
+The Dockerfile was updated to install PyTorch from the official CPU wheel index and execute a startup command that displays the installed PyTorch version and CUDA availability.
+
+## Objectives
+
+- Inspect and repair the existing Dockerfile.
+- Configure PyTorch installation using the CPU-only wheel index.
+- Build the Docker image with the required tag.
+- Configure a CPU-compatible default container command.
+- Verify successful container execution.
+- Confirm that CUDA availability returns `False`.
+
+## Environment and Tools
+
+| Component | Configuration |
+|---|---|
+| Platform | xFusionCorp Industries ML Lab |
+| Container technology | Docker |
+| Base image | python:3.11-slim |
+| Deep-learning framework | PyTorch |
+| PyTorch installation | CPU-only wheel index |
+| Image name | dl-trainer |
+| Image tag | v1 |
+| Working directory | /app |
+| Hardware | CPU-only |
+
+## 1. Initial Dockerfile Problems
+
+The original Dockerfile contained two configuration issues:
+
+**Incorrect PyTorch package index**
+
+```bash
+--index-url https://download.pytorch.org/whl/gpu
+```
+
+This targeted GPU wheels instead of the required CPU-only packages.
+
+**Incorrect startup command**
+
+```dockerfile
+CMD ["python3", "-c", "import torch; assert torch.cuda.is_available(), 'CUDA required'"]
+```
+
+This command required CUDA to be available, which is incompatible with the CPU-only lab environment.
+
+## 2. Corrected Dockerfile
+
+The Dockerfile was updated as follows:
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cpu \
+    torch
+
+CMD ["python3", "-c", "import torch; print(torch.__version__, 'cuda?', torch.cuda.is_available())"]
+```
+
+### Configuration Explanation
+
+- `FROM python:3.11-slim`: Uses a lightweight Python base image.
+- `WORKDIR /app`: Sets the container working directory.
+- `pip install`: Installs PyTorch without retaining pip's download cache.
+- `--index-url`: Targets the official PyTorch CPU wheel index.
+- `CMD`: Prints the installed PyTorch version and checks CUDA availability without requiring a GPU.
+
+## 3. Docker Image Build
+
+The image was built from the project directory:
+
+```bash
+cd /root/code/dl-docker
+
+docker build -t dl-trainer:v1 .
+```
+
+### Build Result
+
+```text
+[+] Building 49.0s (7/7) FINISHED
+[1/3] FROM python:3.11-slim
+[2/3] WORKDIR /app
+[3/3] RUN pip install --no-cache-dir
+exporting to image
+naming to docker.io/library/dl-trainer:v1
+```
+
+**Result:** Docker successfully built the image and assigned the required `dl-trainer:v1` tag.
+
+## 4. Run the Docker Container
+
+The container was executed using:
+
+```bash
+docker run --rm dl-trainer:v1
+```
+
+### Actual Execution Output
+
+```text
+/usr/local/lib/python3.11/site-packages/torch/_subclasses/functional_tensor.py:377:
+UserWarning: Failed to initialize NumPy: No module named 'numpy'
+
+2.15.0+cpu cuda? False
+```
+
+The NumPy warning was non-fatal. The container executed successfully and printed the required PyTorch version and CUDA availability.
+
+### Execution Verification
+
+| Requirement | Actual Result |
+|---|---|
+| PyTorch installed | 2.15.0+cpu |
+| CUDA availability | False |
+| Container execution | Successful |
+| Container exit | Successful |
+| GPU dependency | None |
+
+## 5. Docker Image Verification
+
+The built image was verified using:
+
+```bash
+docker images dl-trainer:v1
+```
+
+### Actual Output
+
+```text
+IMAGE           ID             DISK USAGE
+dl-trainer:v1   9a4b218bf3c7       1.44GB
+```
+
+The image was successfully generated and is available locally.
+
+## 6. Final Verification Checklist
+
+- [x] Corrected the Dockerfile.
+- [x] Replaced the GPU wheel index with the CPU wheel index.
+- [x] Removed the CUDA-required assertion.
+- [x] Configured the default command to print the PyTorch version.
+- [x] Configured the default command to report CUDA availability.
+- [x] Successfully built `dl-trainer:v1`.
+- [x] Successfully executed `docker run --rm dl-trainer:v1`.
+- [x] Confirmed the output contains `cuda? False`.
+- [x] Verified the image using `docker images`.
+
+## Project Outcome
+
+The PyTorch CPU-only Docker image was successfully built and tested.
+
+The corrected Dockerfile installs PyTorch using the CPU wheel repository and runs correctly without GPU hardware.
+
+The final execution produced:
+
+```text
+2.15.0+cpu cuda? False
+```
+
+This confirms that the installed PyTorch environment operates in CPU mode and satisfies the lab's required container startup behavior.
+
+## Conclusion
+
+This lab demonstrates practical Docker and machine-learning environment configuration skills, including:
+
+- Dockerfile troubleshooting and correction.
+- Python container configuration.
+- PyTorch CPU-only installation.
+- Docker image building and tagging.
+- Container startup command configuration.
+- Runtime verification and troubleshooting.
+
+**Project:** PyTorch CPU-Only Docker Image  
+**Platform:** xFusionCorp Industries  
+**Image:** `dl-trainer:v1`  
+**Final Status:** Successfully built and executed
