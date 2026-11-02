@@ -1,0 +1,151 @@
+# xFusionCorp Industries — Fraud Detection Image Publishing
+
+## Project Overview
+
+The ML Platform team at xFusionCorp Industries required the fraud-detection Docker image to be published to a private local Docker registry for downstream clusters.
+
+The registry was already running using the `registry:2` image and exposed on host port `5555`.
+
+The objective was to complete the publishing workflow in `/root/code/ml-registry/push.sh`, ensuring the image could be built, tagged, pushed, and retrieved from the registry by version tag.
+
+## Environment
+
+| Component | Configuration |
+|---|---|
+| Project directory | `/root/code/ml-registry/` |
+| Build script | `push.sh` |
+| Dockerfile | `Dockerfile` |
+| Training script | `train.py` |
+| Base image | `python:3.11-slim` |
+| Local image | `fraud-detector:v1` |
+| Registry container | `local-registry` |
+| Registry image | `registry:2` |
+| Registry endpoint | `http://localhost:5555` |
+| Published image | `localhost:5555/fraud-detector:v1` |
+
+## Implementation
+
+The existing Dockerfile was already configured to install the required Python packages, copy the training script, and generate the model during image construction.
+
+The `push.sh` script already contained the Docker build operation. The missing publishing flow was completed by adding:
+
+```bash
+REGISTRY_IMAGE="localhost:5555/fraud-detector:v1"
+
+docker tag "$IMAGE" "$REGISTRY_IMAGE"
+docker push "$REGISTRY_IMAGE"
+```
+
+The script also performs HTTP checks against the registry catalogue and image tags endpoint.
+
+## Completed Publishing Workflow
+
+1. Build the Docker image as `fraud-detector:v1`.
+2. Tag the image for the local registry.
+3. Push the tagged image to port `5555`.
+4. Query the registry catalogue.
+5. Verify that the `v1` tag is available.
+6. Confirm the locally built image exists.
+
+## Execution
+
+Run the following commands:
+
+```bash
+cd /root/code/ml-registry
+chmod +x push.sh
+./push.sh
+```
+
+## Execution Preview
+
+**Docker image build**
+
+```text
+[+] Building 30.8s (10/10) FINISHED
+```
+
+**Registry publishing**
+
+```text
+The push refers to repository
+[localhost:5555/fraud-detector]
+
+44136fa355b3: Pushed
+6fc242d221a6: Pushed
+ee5aaeba9945: Pushed
+af62284e421e: Pushed
+24ff04c92107: Pushed
+361db8171547: Pushed
+2d79ab7b2153: Pushed
+1200ef2d7078: Pushed
+fd2a6184beb9: Pushed
+c4c9c58c42b3: Pushed
+
+v1: digest: sha256:1e68fe6a5ca116bd360e324453b5c52e1e2bbf1f22dffa18c7cb0da749c8a8e3 size: 856
+```
+
+## Registry Verification
+
+**1. Registry catalogue**
+
+Command:
+
+```bash
+curl http://localhost:5555/v2/_catalog
+```
+
+Actual output:
+
+```json
+{"repositories":["fraud-detector"]}
+```
+
+**2. Image tags**
+
+Command:
+
+```bash
+curl http://localhost:5555/v2/fraud-detector/tags/list
+```
+
+Actual output:
+
+```json
+{"name":"fraud-detector","tags":["v1"]}
+```
+
+**3. Local Docker image**
+
+Command:
+
+```bash
+docker images fraud-detector:v1
+```
+
+Actual output:
+
+```text
+IMAGE          ID             DISK USAGE
+fraud-detector:v1
+               1e68fe6a5ca1        576MB
+```
+
+## Final Outcome
+
+The publishing workflow was successfully implemented and executed.
+
+- The fraud-detection image was built locally.
+- The image was tagged for the private registry.
+- Docker successfully pushed the image to the registry.
+- The registry catalogue returned `fraud-detector`.
+- The tags endpoint confirmed version `v1`.
+- The local image remained available as `fraud-detector:v1`.
+
+**Conclusion:** The fraud-detection Docker image is successfully published and available from the local private registry at:
+
+```text
+localhost:5555/fraud-detector:v1
+```
+
+**Status: SUCCESS — All required publishing and registry verification checks passed.**
