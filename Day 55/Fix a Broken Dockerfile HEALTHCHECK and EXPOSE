@@ -1,0 +1,82 @@
+# ML Health API Dockerization (`ml-health:v1`)
+
+This project containerizes a Flask-based inference and health-monitoring API with proper Docker metadata, exposure declarations, and native health checks.
+
+---
+
+## 🏗️ Requirements & Architecture
+
+1. **Base Image:** `python:3.11-slim`
+2. **Port Exposure:** Declares port `8085` using `EXPOSE` so image metadata and orchestration engines recognize the serving port.
+3. **Health Check:** Automatically queries the `/health` endpoint using `curl` at regular intervals to verify application readiness and liveness.
+4. **Execution:** Runs as a container named `ml-health-api` with host port `8085` published.
+
+---
+
+## 📂 Dockerfile Configuration (`/root/code/ml-health/Dockerfile`)
+
+```dockerfile
+FROM python:3.11-slim
+
+# Install curl for healthcheck probes
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY app.py .
+
+RUN pip install --no-cache-dir flask
+
+# Expose port metadata
+EXPOSE 8085
+
+# Define container health check
+HEALTHCHECK --interval=5s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:8085/health || exit 1
+
+CMD ["python", "app.py"]
+🚀 Build and Run Instructions
+Build the Docker Image:
+
+Bash
+docker build -t ml-health:v1 .
+Run the Container:
+
+Bash
+docker run -d --name ml-health-api -p 8085:8085 ml-health:v1
+✅ Verification & Testing
+Verify that the configuration meets all expected criteria:
+
+Verify Exposed Ports Metadata:
+
+Bash
+docker inspect --format '{{.Config.ExposedPorts}}' ml-health:v1
+Expected Output: map[8085/tcp:{}]
+
+Verify Container Health Status:
+
+Bash
+docker inspect --format='{{.State.Health.Status}}' ml-health-api
+Expected Output: healthy (allow ~10–15 seconds for probes to complete).
+
+Test the Health Endpoint:
+
+Bash
+curl http://localhost:8085/health
+Expected Output: {"status":"ok"}
+
+
+---
+
+### 🖥️ Task Preview
+
+As seen in your active terminal, the container is successfully built, deployed, and passing all checks:
+
+```text
+root@controlplane ~/code/ml-health via 🐍 v3.12.3 ➜ docker inspect --format '{{.Config.ExposedPorts}}' ml-health:v1
+map[8085/tcp:{}]
+
+root@controlplane ~/code/ml-health via 🐍 v3.12.3 ➜ docker inspect --format='{{.State.Health.Status}}' ml-health-api
+healthy
+
+root@controlplane ~/code/ml-health via 🐍 v3.12.3 ➜ curl http://localhost:8085/health
+{"status":"ok"}
