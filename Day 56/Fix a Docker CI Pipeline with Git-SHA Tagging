@@ -1,0 +1,113 @@
+xFusionCorp Industries — ML Platform Docker CI Pipeline
+This project provides a fully automated, four-stage shell-based Docker CI/CD pipeline (build.sh) designed for the fraud-detection Flask microservice. The pipeline standardizes automated testing, image construction, semantic tagging via Git short SHAs, and secure artifact publishing to a local private registry.
+
+📁 Repository Layout
+Plaintext
+/root/code/ci/
+├── app/
+│   ├── app.py             # Flask application exposing /health and /predict endpoints (Port 8086)
+│   ├── test_app.py        # Pytest test suite covering health checks and fraud classification flows
+│   ├── Dockerfile         # Python 3.11-slim container specification
+│   └── .git/              # Initialized local Git repository with baseline commit history
+└── build.sh               # Automated end-to-end CI/CD script
+🚀 Pipeline Execution Flow (build.sh)
+The script executes four consecutive stages under strict error handling (set -euo pipefail):
+
+Test Stage: Discovers and runs pytest across the app/ directory to validate service behavior prior to containerization.
+
+Build Stage: Compiles the local container image (ml-ci-app:latest) using the isolated app/ build context.
+
+Tag Stage: Dynamically extracts the active short Git SHA via git -C app rev-parse --short HEAD and applies tags for the local private registry (localhost:5555).
+
+Push Stage: Publishes both the unique SHA-tagged artifact and the latest reference to the local registry:2 instance.
+
+🛠️ Complete build.sh Implementation
+Bash
+#!/bin/bash
+# Shell-based CI pipeline for the ml-ci-app image.
+#
+# Stages: test -> build -> tag (git SHA) -> push to local registry.
+# Run from /root/code/ci/.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+IMAGE="ml-ci-app"
+REGISTRY="localhost:5555"
+
+# --- Stage 1: test
+echo "[ci] stage 1/4 — running tests"
+python3 -m pytest app/
+
+# --- Stage 2: build
+echo "[ci] stage 2/4 — building image"
+docker build -t "$IMAGE:latest" app/
+
+# --- Stage 3: tag
+echo "[ci] stage 3/4 — tagging"
+SHA=$(git -C app rev-parse --short HEAD)
+TAGGED="$REGISTRY/$IMAGE:$SHA"
+docker tag "$IMAGE:latest" "$TAGGED"
+docker tag "$IMAGE:latest" "$REGISTRY/$IMAGE:latest"
+
+# --- Stage 4: push
+echo "[ci] stage 4/4 — pushing"
+docker push "$TAGGED"
+docker push "$REGISTRY/$IMAGE:latest"
+
+echo "[ci] complete: $TAGGED"
+📊 Execution & Output Previews
+1. Running the Pipeline
+Bash
+chmod +x build.sh
+./build.sh
+Terminal Output Preview:
+
+Plaintext
+[ci] stage 1/4 — running tests
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /root/code/ci
+collected 3 items                                                            
+
+app/test_app.py ...                                                    [100%]
+============================= 3 passed in 0.13s ==============================
+
+[ci] stage 2/4 — building image
+[+] Building 15.5s (9/9) FINISHED                              docker:default
+ => [internal] load build definition from Dockerfile                     0.1s
+ => [4/4] COPY app.py /app/app.py                                        0.1s 
+ => exporting to image                                                   5.4s 
+ => naming to docker.io/library/ml-ci-app:latest                      0.0s
+
+[ci] stage 3/4 — tagging
+[ci] stage 4/4 — pushing
+The push refers to repository [localhost:5555/ml-ci-app]
+26017ff: digest: sha256:df44f44142ea77a640a8b68a18c0a801895f93a6383a7454d8248a9ecc977abd size: 856
+[ci] complete: localhost:5555/ml-ci-app:26017ff
+2. Verification Commands & Expected Results
+Check locally built images:
+
+Bash
+docker images ml-ci-app:latest
+Preview:
+
+Plaintext
+IMAGE              ID             DISK USAGE   CONTENT SIZE   EXTRA
+ml-ci-app:latest   df44f44142ea        212MB         51.4MB        
+Verify private registry catalog:
+
+Bash
+curl -s http://localhost:5555/v2/_catalog
+Preview:
+
+JSON
+{"repositories":["ml-ci-app"]}
+Inspect repository tags array:
+
+Bash
+curl -s http://localhost:5555/v2/ml-ci-app/tags/list
+Preview:
+
+JSON
+{"name":"ml-ci-app","tags":["26017ff","latest"]}
