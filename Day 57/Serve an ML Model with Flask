@@ -1,0 +1,65 @@
+# Fraud-Detection ML Serving Service
+
+A lightweight Flask web application that serves a pre-trained Random Forest model over HTTP to score transactions synchronously.
+
+## Project Structure
+
+```text
+/root/code/serving/
+├── app.py          # Flask application handling /health and /predict endpoints
+├── model.pkl       # Pre-trained RandomForest classifier
+├── train.csv       # Training dataset used to fit the model
+└── README.md       # Project documentation
+Previews & Verification
+1. Flask Server Startup
+When starting the application, the server binds successfully to port 8085 across all interfaces:
+
+Bash
+python3 app.py
+(Preview output)
+
+Plaintext
+ * Serving Flask app 'app'
+ * Debug mode: off
+ * Running on all addresses (0.0.0.0)
+ * Running on [http://127.0.0.1:8085](http://127.0.0.1:8085)
+ * Running on [http://10.244.29.226:8085](http://10.244.29.226:8085)
+2. API Endpoints Output
+Health Check (GET /health)
+Bash
+curl http://localhost:8085/health
+(Preview response)
+
+JSON
+{"status":"ok"}
+High-Risk Transaction Prediction (POST /predict)
+Bash
+curl -X POST http://localhost:8085/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":3200,"hour":23,"num_tx_past_day":5}'
+(Preview response)
+
+JSON
+{"is_fraud":1}
+Low-Risk Daytime Transaction Prediction (POST /predict)
+Bash
+curl -X POST http://localhost:8085/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":25.5,"hour":10,"num_tx_past_day":1}'
+(Preview response)
+
+JSON
+{"is_fraud":0}
+API Reference
+Endpoint	Method	Description	Example Request Body	Expected Response
+/health	GET	Service availability check	None	{"status":"ok"}
+/predict	POST	Scores transaction data	{"amount": 3200, "hour": 23, "num_tx_past_day": 5}	{"is_fraud": 1}
+Setup & Running Locally
+Install required dependencies:
+
+Bash
+pip install flask scikit-learn pandas
+Run the Flask application:
+
+Bash
+python3 app.py
