@@ -1,0 +1,95 @@
+# 🛡️ Fraud Detection API Service
+
+<p align="center">
+  <img src="https://img.shields.io/badge/FastAPI-0.100%25-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/scikit--learn-Model-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white" alt="Scikit-Learn">
+  <img src="https://img.shields.io/badge/Pydantic-Validation-E92063?style=for-the-badge&logo=pydantic&logoColor=white" alt="Pydantic">
+  <img src="https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge" alt="Status">
+</p>
+
+A production-ready machine learning microservice built with **FastAPI**, **Pydantic**, and **scikit-learn** for the xFusionCorp Industries ML platform. It hosts a deterministic `RandomForest` model that scores financial transactions to flag potential fraud.
+
+---
+
+## 📂 Project Structure
+
+```text
+/root/code/serving/
+├── app.py          # FastAPI application, routing, and Pydantic validation schemas
+├── model.pkl       # Pre-trained Random Forest model
+├── train.csv       # Source dataset used to fit the model
+└── README.md       # Project documentation
+🚀 Key Features
+Automated Schema Validation: Strict input validation using Pydantic (amount > 0, 0 <= hour <= 23, num_tx_past_day >= 0) ensuring invalid entries are instantly rejected with an HTTP 422 Unprocessable Entity.
+
+Interactive Swagger UI: Auto-generated API documentation available right out of the box.
+
+Monitoring & Auditing: Endpoints dedicated to system health checks (/health) and recent prediction tracking (/last-predictions).
+
+📊 API Endpoints Overview
+Method	Endpoint	Description
+GET	/	Automatically redirects to the interactive Swagger UI (/docs).
+GET	/health	Returns the operational health status ({"status": "ok"}).
+POST	/predict	Scores a transaction payload and returns the fraud classification ({"is_fraud": 0|1}).
+GET	/last-predictions	Returns an in-memory audit history of recently processed predictions.
+👁️ Previews & Examples
+1. Request Preview (POST /predict)
+Below is an example of what input payloads look like when interacting with the service:
+
+High-Risk Transaction (Late-night & High-Value):
+
+JSON
+{
+  "amount": 3200.0,
+  "hour": 23,
+  "num_tx_past_day": 5
+}
+Response Output (Flagged Fraud):
+
+JSON
+{
+  "is_fraud": 1
+}
+Low-Risk Transaction (Daytime & Low-Value):
+
+JSON
+{
+  "amount": 25.5,
+  "hour": 10,
+  "num_tx_past_day": 1
+}
+Response Output (Passed):
+
+JSON
+{
+  "is_fraud": 0
+}
+⚙️ Running Locally
+Clone or navigate to the serving directory:
+
+Bash
+cd /root/code/serving/
+Start the FastAPI server via Uvicorn on port 8085:
+
+Bash
+uvicorn app:app --host 0.0.0.0 --port 8085 --reload
+Access the Interactive Documentation:
+Open your browser and visit:
+http://localhost:8085/docs
+
+🔌 Testing via curl
+Test High-Risk Fraud Scoring:
+
+Bash
+curl -X 'POST' \
+  'http://localhost:8085/predict' \
+  -H 'Content-Type: application/json' \
+  -d '{"amount": 3200, "hour": 23, "num_tx_past_day": 5}'
+Test Validation Error (Out-of-range Hour 25):
+
+Bash
+curl -X 'POST' \
+  'http://localhost:8085/predict' \
+  -H 'Content-Type: application/json' \
+  -d '{"amount": 100, "hour": 25, "num_tx_past_day": 2}'
+(Returns 422 Unprocessable Entity automatically before the model runs)
