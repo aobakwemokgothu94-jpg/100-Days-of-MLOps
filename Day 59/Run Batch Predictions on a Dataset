@@ -1,0 +1,65 @@
+Day 59: Run Batch Predictions on a Dataset
+Overview & Objective
+In production machine learning systems, online inference via API endpoints (like Flask or FastAPI) handles real-time requests, but offline batch processing is critical for scoring large volumes of historical data, nightly transactions, or scheduled data dumps.
+
+For this task, the goal was to implement a standalone batch scoring script (batch_predict.py) for xFusionCorp Industries to process an overnight transaction batch using a pre-trained fraud-detection model, generating discrete integer class predictions.
+
+Project Architecture & Layout
+Plaintext
+/root/code/serving/
+├── model.pkl            # Deterministic RandomForest model trained on features: amount, hour, num_tx_past_day
+├── input.csv            # 10-row batch input dataset containing feature columns (no labels)
+├── predictions.csv      # Generated output containing original features plus discrete prediction labels
+└── batch_predict.py     # Batch scoring implementation script
+Implementation Details (batch_predict.py)
+The scoring script performs four core operations:
+
+Model Loading: Unserializes the pre-trained RandomForest classification model from model.pkl using joblib.
+
+Data Ingestion: Reads the batch input features from input.csv using pandas.
+
+Inference Execution: Applies model.predict(df) to score each transaction row, ensuring output labels are strictly cast to integers (0 for normal, 1 for fraudulent transactions).
+
+Result Persist: Appends the prediction column to the original dataset and saves the complete dataframe to predictions.csv without retaining the DataFrame index.
+
+Code Implementation
+Python
+import pandas as pd
+import joblib
+
+MODEL_PATH = "/root/code/serving/model.pkl"
+INPUT_CSV = "/root/code/serving/input.csv"
+OUTPUT_CSV = "/root/code/serving/predictions.csv"
+
+def main():
+    # Load the pre-trained model
+    model = joblib.load(MODEL_PATH)
+    
+    # Read the input features dataset
+    df = pd.read_csv(INPUT_CSV)
+    
+    # Generate integer class predictions (0 or 1)
+    predictions = model.predict(df)
+    
+    # Append the prediction column explicitly as integers
+    df["prediction"] = predictions.astype(int)
+    
+    # Save the output to predictions.csv without index
+    df.to_csv(OUTPUT_CSV, index=False)
+    print(f"Predictions successfully written to {OUTPUT_CSV}")
+
+if __name__ == "__main__":
+    main()
+Execution & Verification
+To execute the batch scoring pipeline locally:
+
+Bash
+python3 /root/code/serving/batch_predict.py
+Verification Criteria Checklist
+File Existence: /root/code/serving/predictions.csv successfully generated.
+
+Schema Integrity: Contains all 3 input feature columns plus the new prediction column.
+
+Data Types: Every value under the prediction column is an explicit integer (0 or 1), avoiding floating-point probabilities.
+
+Row Count Matching: The output row count strictly matches the 10 rows provided in input.csv.
