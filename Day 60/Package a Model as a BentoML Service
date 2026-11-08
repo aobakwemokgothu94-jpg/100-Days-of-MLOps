@@ -1,0 +1,177 @@
+# BentoML Fraud Detection Serving
+
+## Project Overview
+
+This project deploys a trained fraud-detection machine learning model using BentoML. The registered model is loaded from BentoML's local model store and exposed through HTTP APIs.
+
+The service uses the modern `@bentoml.service` class API.
+
+## Project Structure
+
+```text
+serving/
+├── service.py
+├── train.csv
+└── README.md
+```
+
+## Technology Stack
+
+- Python 3.12
+- BentoML 1.4.39
+- Scikit-learn
+- NumPy
+- REST API
+- Swagger UI
+
+## Model Registration
+
+The fraud-detection model is registered in BentoML's local model store under:
+
+```text
+fraud_detector:latest
+```
+
+Verify registration:
+
+```bash
+bentoml models list
+```
+
+## Service Implementation
+
+The `FraudService` class loads the registered model:
+
+```python
+bento_model = bentoml.models.BentoModel("fraud_detector:latest")
+
+def __init__(self):
+    self.model = bentoml.sklearn.load_model(self.bento_model)
+    self._history = []
+```
+
+The prediction handler accepts three transaction features:
+
+- `amount`
+- `hour`
+- `num_tx_past_day`
+
+It constructs a NumPy feature array, scores the transaction using `self.model.predict()`, converts the result to an integer, and records the prediction in the audit history.
+
+## Starting the Server
+
+```bash
+cd /root/code/serving
+
+bentoml serve service:FraudService --host 0.0.0.0 --port 3000
+```
+
+The Swagger UI is available at:
+
+```text
+http://localhost:3000/
+```
+
+## API Endpoints
+
+### 1. Health and Swagger Interface
+
+```bash
+curl -i http://localhost:3000/
+```
+
+Verified result: `HTTP/1.1 200 OK`.
+
+### 2. Fraud Prediction
+
+Endpoint:
+
+```text
+POST /predict
+```
+
+High-value transaction:
+
+```bash
+curl -X POST http://localhost:3000/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":3200,"hour":23,"num_tx_past_day":5}'
+```
+
+Actual response:
+
+```json
+{"is_fraud": 1}
+```
+
+Low-value transaction:
+
+```bash
+curl -X POST http://localhost:3000/predict \
+-H "Content-Type: application/json" \
+-d '{"amount":25.5,"hour":10,"num_tx_past_day":1}'
+```
+
+Actual response:
+
+```json
+{"is_fraud": 0}
+```
+
+### 3. Prediction History
+
+Endpoint:
+
+```text
+POST /last_predictions
+```
+
+Verification command:
+
+```bash
+curl -X POST http://localhost:3000/last_predictions
+```
+
+Actual verified response:
+
+```json
+{
+  "count": 2,
+  "predictions": [
+    {
+      "amount": 3200.0,
+      "hour": 23,
+      "num_tx_past_day": 5,
+      "is_fraud": 1
+    },
+    {
+      "amount": 25.5,
+      "hour": 10,
+      "num_tx_past_day": 1,
+      "is_fraud": 0
+    }
+  ]
+}
+```
+
+## Verification Results
+
+| Verification | Result |
+|---|---|
+| BentoML model registration | Passed |
+| Python syntax compilation | Passed |
+| HTTP server startup | Passed |
+| Swagger UI accessibility | HTTP 200 |
+| High-value transaction prediction | 1 |
+| Low-value transaction prediction | 0 |
+| Prediction history | 2 records |
+
+## Conclusion
+
+The BentoML fraud-detection serving task was successfully implemented and tested.
+
+The registered `fraud_detector:latest` model is loaded by the `FraudService` class and exposed through HTTP endpoints on port 3000.
+
+Two distinct transaction payloads produced different fraud classifications, and the audit-history endpoint successfully recorded both predictions.
+
+The implementation satisfies the requested model-serving and prediction-verification requirements.
