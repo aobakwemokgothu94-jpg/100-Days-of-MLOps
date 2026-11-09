@@ -1,0 +1,87 @@
+# Fraud Detection API Service
+
+A lightweight, containerized FastAPI application designed to serve a machine learning model (`RandomForestClassifier`) for predicting fraudulent transactions. 
+
+## Project Structure
+
+```text
+/root/code/serving/
+├── app.py        # FastAPI application (exposes /health and /predict)
+├── Dockerfile    # Defines the python:3.11-slim container environment
+└── model.pkl     # Trained RandomForest model artifact
+Prerequisites
+Docker installed on the host.
+
+Pre-built Docker image: fraud-detector:v1
+
+Deployment Instructions
+Option 1: Deploy via Docker CLI
+Run the container with the required bind-mount and port publishing:
+
+Bash
+docker run -d \
+  --name fraud-api \
+  -p 8085:8085 \
+  -v /root/code/serving:/app \
+  fraud-detector:v1
+Verify that the container is running:
+
+Bash
+docker inspect fraud-api
+Option 2: Deploy via Portainer UI
+Access Portainer (running on port 9090).
+
+Navigate to Containers -> Add container.
+
+Configure the container parameters:
+
+Name: fraud-api
+
+Image: fraud-detector:v1
+
+Network ports configuration: Map Host 8085 
+→
+→ Container 8085
+
+Volumes tab: Map Host path /root/code/serving 
+→
+→ Container path /app
+
+Click Deploy the container.
+
+API Endpoints & Verification
+1. Health Check
+Endpoint: GET /health
+
+Command:
+
+Bash
+curl http://localhost:8085/health
+Expected Response:
+
+JSON
+{"status": "ok"}
+2. Prediction Endpoint
+Endpoint: POST /predict
+
+Command:
+
+Bash
+curl -X POST http://localhost:8085/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"amount": 3200, "hour": 23, "num_tx_past_day": 5}'
+Expected Response:
+
+JSON
+{"is_fraud": 1}
+
+---
+
+### Task Preview & Executive Summary
+
+* **Objective:** Deploy and verify the `fraud-api` model-serving container using image inspection, correct bind-mounting (`/root/code/serving` $\rightarrow$ `/app`), and port publishing (`8085`).
+* **Runtime Stack:** Python 3.11, FastAPI, Uvicorn, Scikit-Learn, Joblib, and Docker.
+* **Current Status:** 
+  * Container successfully started (`fraud-api`).
+  * Bind-mount active and verified via `docker inspect`.
+  * `/health` and `/predict` endpoints verified and returning expected responses (`{"status":"ok"}` and `{"is_fraud":1}`).
