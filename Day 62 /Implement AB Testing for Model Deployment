@@ -1,0 +1,68 @@
+Fraud Detection A/B Model Routing
+Task Overview
+This task implements an A/B traffic router in a Flask application for two pre-trained fraud-detection models:
+- model_v1.pkl — stable model, receives approximately 80% of prediction requests.
+- model_v2.pkl — candidate model, receives approximately 20% of prediction requests.
+The application is located at /root/code/serving/ and runs on port 8085.
+Implementation
+The /predict endpoint selects a model for each request using random.random():
+if random.random() < 0.8:
+    model = MODEL_V1
+    model_version = "v1"
+else:
+    model = MODEL_V2
+    model_version = "v2"
+
+prediction = int(model.predict(features)[0])
+
+return jsonify({
+    "is_fraud": prediction,
+    "model_version": model_version
+}), 200
+The response includes:
+- is_fraud: the model prediction converted to an integer.
+- model_version: identifies the model used (v1 or v2).
+API Endpoints
+Health check
+GET /health
+Successful response:
+{
+  "status": "ok"
+}
+Fraud prediction
+POST /predict
+Content-Type: application/json
+Example request:
+{
+  "amount": 125.50,
+  "hour": 14,
+  "num_tx_past_day": 3
+}
+Each successful response contains is_fraud and model_version. The prediction value depends on the selected pre-trained model and supplied features.
+Verification
+The Flask server was started with:
+cd /root/code/serving
+python ab_server.py
+The health endpoint returned:
+{"status":"ok"}
+A batch test sent 200 POST requests to /predict and checked that every response contained is_fraud and a valid model_version.
+Observed traffic distribution
+Model	Requests	Share
+V1	162	81%
+V2	38	19%
+Total	200	100%
+
+
+The task's accepted tolerance was 140–180 requests for V1 and 20–60 requests for V2. Both observed counts were within those ranges.
+
+Test result: PASSED
+Files
+The task directory contains the Flask application and the two pre-trained model files:
+/root/code/serving/
+├── ab_server.py
+├── model_v1.pkl
+└── model_v2.pkl
+Notes
+- The 80/20 split is probabilistic. Individual batches may vary while remaining consistent with the configured routing probability.
+- The Flask development server is suitable for this lab verification, not production deployment.
+- This documentation records the implementation and test output observed during the task; it does not claim an external grader result.
