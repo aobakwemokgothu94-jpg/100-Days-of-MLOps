@@ -1,0 +1,162 @@
+# Asynchronous Fraud Detection API Using Flask and Redis
+
+## 1. Project Overview
+
+This task involved implementing Redis result storage and retrieval for an asynchronous fraud-detection scoring system developed for xFusionCorp Industries.
+
+The application uses Flask as its HTTP entry point. Prediction requests are processed by a background worker so that the HTTP endpoint can return a task ID without waiting for the model prediction to finish.
+
+Redis is used to persist completed prediction results, allowing clients to retrieve them through a separate HTTP endpoint.
+
+## 2. Technologies Used
+
+- Python 3
+- Flask
+- Redis
+- redis-py
+- NumPy
+- Joblib
+- RandomForest model
+- Python threading
+
+## 3. Project Structure
+
+```text
+/root/code/serving/
+├── model.pkl
+└── async_app.py
+```
+
+## 4. Redis Configuration
+
+The application connects to Redis on localhost port 6379.
+
+```python
+REDIS = redis.Redis(
+    host="localhost",
+    port=6379,
+    decode_responses=True
+)
+```
+
+Redis result configuration:
+
+```python
+RESULT_KEY = "result:{task_id}"
+RESULT_TTL_SECONDS = 600
+```
+
+Each prediction result is stored using the key format:
+
+`result:<task_id>`
+
+The configured expiration time is 600 seconds.
+
+## 5. Implementation Details
+
+### Background prediction worker
+
+The background worker performs the following operations:
+
+1. Receives the task ID and transaction features.
+2. Executes the trained RandomForest model.
+3. Converts the prediction into an integer.
+4. Stores the prediction in Redis.
+5. Sets the Redis key expiration to 600 seconds.
+
+Implementation:
+
+```python
+key = RESULT_KEY.format(task_id=task_id)
+REDIS.set(key, is_fraud, ex=RESULT_TTL_SECONDS)
+```
+
+### Result retrieval endpoint
+
+The GET endpoint retrieves the completed prediction from Redis.
+
+```python
+key = RESULT_KEY.format(task_id=task_id)
+value = REDIS.get(key)
+
+if value is None:
+    return jsonify({
+        "task_id": task_id,
+        "status": "pending"
+    }), 202
+
+return jsonify({
+    "task_id": task_id,
+    "is_fraud": int(value)
+}), 200
+```
+
+If the result is not yet available, the endpoint returns a pending response. Otherwise, it returns the task ID and fraud classification.
+
+## 6. API Workflow
+
+### Step 1: Submit a prediction
+
+Endpoint:
+
+`POST /predict-async`
+
+Example request:
+
+```json
+{
+  "amount": 250.50,
+  "hour": 14,
+  "num_tx_past_day": 3
+}
+```
+
+The endpoint returns a unique task ID with HTTP status 202.
+
+### Step 2: Retrieve the prediction
+
+Endpoint:
+
+`GET /result/<task_id>`
+
+The client uses the returned task ID to retrieve the stored prediction.
+
+## 7. Testing and Verification
+
+The following tests were completed:
+
+| Test | Result |
+|---|---|
+| Python syntax validation | Passed |
+| Redis connectivity | Passed |
+| Flask application startup | Passed |
+| POST prediction request | Passed |
+| Task ID generation | Passed |
+| Background prediction | Passed |
+| Redis result storage and retrieval | Passed |
+| Fraud classification retrieval | Passed |
+
+### Actual test result
+
+Task ID:
+
+`474e14950a9e43f09c91b393f339a7fc`
+
+Actual GET response:
+
+```json
+{
+  "is_fraud": 0,
+  "task_id": "474e14950a9e43f09c91b393f339a7fc"
+}
+```
+
+The application successfully returned the prediction result from Redis.
+
+## 8. Conclusion
+
+The Redis round-trip functionality was implemented successfully in `async_app.py`.
+
+The application accepts asynchronous prediction requests, processes them in a background thread, stores completed predictions in Redis with a configured 600-second TTL, and retrieves the results through the GET endpoint.
+
+The end-to-end test successfully returned an `is_fraud` classification of `0` for the submitted test transaction.
