@@ -1,0 +1,145 @@
+Multi-Model Serving Architecture (multi-model)
+This project implements a multi-model serving platform for xFusionCorp Industries, routing requests across three independent Flask-based microservices (fraud, churn, and recommend) through a single centralized Nginx reverse proxy running on port 8085.
+
+Architecture Overview
+Plaintext
+[ Client Request ] 
+       │
+       ▼ (Port 8085)
+   [ Nginx Reverse Proxy ]
+       ├── /fraud/     ──► [ Fraud Service (Port 5000) ]
+       ├── /churn/     ──► [ Churn Service (Port 5000) ]
+       └── /recommend/ ──► [ Recommend Service (Port 5000) ]
+Project Structure
+Plaintext
+/root/code/serving/multi-model/
+├── fraud/
+│   ├── app.py
+│   └── Dockerfile
+├── churn/
+│   ├── app.py
+│   └── Dockerfile
+├── recommend/
+│   ├── app.py
+│   └── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+└── README.md
+Configuration Files
+1. docker-compose.yml
+Orchestrates the build and deployment of all three Python microservices alongside the Nginx reverse proxy.
+
+YAML
+version: '3.8'
+
+services:
+  fraud:
+    build: ./fraud
+    container_name: mm-fraud
+    restart: always
+    expose:
+      - "5000"
+
+  churn:
+    build: ./churn
+    container_name: mm-churn
+    restart: always
+    expose:
+      - "5000"
+
+  recommend:
+    build: ./recommend
+    container_name: mm-recommend
+    restart: always
+    expose:
+      - "5000"
+
+  nginx:
+    image: nginx:alpine
+    container_name: mm-nginx
+    restart: always
+    ports:
+      - "8085:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - fraud
+      - churn
+      - recommend
+2. nginx.conf
+Configures upstream load balancing and path-based routing rules to direct incoming requests to the proper backend container.
+
+Nginx
+upstream fraud {
+    server fraud:5000;
+}
+
+upstream churn {
+    server churn:5000;
+}
+
+upstream recommend {
+    server recommend:5000;
+}
+
+server {
+    listen 80;
+
+    location /fraud/ {
+        proxy_pass http://fraud/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /churn/ {
+        proxy_pass http://churn/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /recommend/ {
+        proxy_pass http://recommend/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+Preview & Verification
+1. Check Container Status
+Running docker compose ps confirms that all four microservices are running successfully:
+
+Plaintext
+NAME           IMAGE                   COMMAND                  SERVICE     CREATED          STATUS          PORTS
+mm-churn       multi-model-churn       "python3 /app/app.py"    churn       11 seconds ago   Up 9 seconds    5000/tcp
+mm-fraud       multi-model-fraud       "python3 /app/app.py"    fraud       11 seconds ago   Up 10 seconds   5000/tcp
+mm-nginx       nginx:alpine            "/docker-entrypoint.…"   nginx       10 seconds ago   Up 9 seconds    0.0.0.0:8085->80/tcp, [::]:8085->80/tcp
+mm-recommend   multi-model-recommend   "python3 /app/app.py"    recommend   11 seconds ago   Up 9 seconds    5000/tcp
+2. Endpoint Test Results
+All endpoints correctly process JSON payload requests through the Nginx reverse proxy:
+
+Fraud Service (/fraud/predict)
+
+Bash
+curl -X POST http://localhost:8085/fraud/predict -H "Content-Type: application/json" -d '{}'
+Response:
+
+JSON
+{"is_fraud":0,"service":"fraud"}
+Churn Service (/churn/predict)
+
+Bash
+curl -X POST http://localhost:8085/churn/predict -H "Content-Type: application/json" -d '{}'
+Response:
+
+JSON
+{"churn_risk":"low","service":"churn"}
+Recommend Service (/recommend/predict)
+
+Bash
+curl -X POST http://localhost:8085/recommend/predict -H "Content-Type: application/json" -d '{}'
+Response:
+
+JSON
+{"items":["item_0","item_1","item_2"],"service":"recommend"}
