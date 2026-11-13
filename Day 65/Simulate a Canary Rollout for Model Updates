@@ -1,0 +1,111 @@
+# Canary Deployment Simulator — Traffic-Ramp Policy
+
+## Project Overview
+
+This project implements a three-phase canary deployment policy using a pure-Python simulator.
+
+The simulator gradually shifts traffic from the stable application version (v1) to the candidate version (v2), monitors the v2 error rate, and automatically rolls back if the error rate exceeds the configured threshold.
+
+The objective is to reduce deployment risk by validating the candidate version before sending it all production traffic.
+
+## Project Location
+
+```text
+/root/code/serving/
+```
+
+### Project Structure
+
+```text
+serving/
+├── canary_deploy.py
+└── README.md
+```
+
+## Implementation Details
+
+### 1. Rollback Threshold
+
+The rollback threshold is configured to 5%.
+
+```python
+ROLLBACK_THRESHOLD = 0.05
+```
+
+If the simulated v2 error rate exceeds 5%, the deployment is rolled back to 100% v1 traffic.
+
+### 2. Three-Phase Traffic Ramp
+
+The `promote()` method implements the following traffic distribution:
+
+| Phase | v1 traffic | v2 traffic | Purpose |
+|---|---:|---:|---|
+| Phase 1 | 95% | 5% | Initial canary |
+| Phase 2 | 70% | 30% | Confidence ramp |
+| Phase 3 | 0% | 100% | Full promotion |
+
+### 3. Request Simulation
+
+The `send_requests()` method:
+- Routes requests according to the current traffic weights.
+- Tracks v1 and v2 request counts.
+- Simulates v2 errors using a seeded random generator.
+- Calculates the v2 error rate.
+
+Configuration:
+
+```python
+REQUESTS_PER_PHASE = 100
+V2_ERROR_RATE = 0.02
+```
+
+The simulator uses `random.Random(seed=42)` to provide reproducible results.
+
+### 4. Rollback Mechanism
+
+The `rollback()` method restores traffic to:
+
+```python
+self.v1_weight = 1.0
+self.v2_weight = 0.0
+```
+
+The main execution loop checks the v2 error rate after every phase. If it exceeds the threshold, the simulator rolls back and reports `OUTCOME: ROLLED_BACK`.
+
+Otherwise, it completes all three phases and reports `OUTCOME: PROMOTED`.
+
+## Execution Instructions
+
+Navigate to the project directory:
+
+```bash
+cd /root/code/serving
+```
+
+Run the simulator:
+
+```bash
+python3 canary_deploy.py
+```
+
+No external packages, API calls, Kubernetes cluster, or network services are required.
+
+## Verified Results
+
+The simulator was executed successfully.
+
+- Phase 1 routed 94 requests to v1 and 6 to v2.
+- Phase 2 routed 70 requests to v1 and 30 to v2.
+- Phase 3 routed all 100 requests to v2.
+- Total requests processed: 300.
+- Final outcome: PROMOTED.
+
+## Conclusion
+
+The canary policy was implemented and locally verified. The simulator successfully followed the required 95/5, 70/30, and 0/100 traffic progression.
+
+The healthy simulated v2 workload remained below the 5% rollback threshold, allowing the deployment to complete with:
+
+**OUTCOME: PROMOTED**
+
+This exercise demonstrates phased traffic shifting, request monitoring, error-rate evaluation, and automated rollback logic using Python.
