@@ -1,0 +1,62 @@
+Production ML Serving & Observability Stack
+This repository/task manages a production-ready machine learning fraud-detection platform deployed via Docker Compose. It integrates a Flask API model service, Redis rate limiting, Nginx reverse proxy, Prometheus metrics scraping, and Grafana visualization.
+
+Architecture Overview
+Plaintext
+ [Traffic Generator] ──> [Nginx Reverse Proxy (:8085)] ──> [Flask Model API (:5000)]
+                                                                    │
+                                                            [Prometheus (:9090)]
+                                                                    │
+                                                             [Grafana (:3000)]
+model-api: Python 3.11 Flask service loading model.pkl to score transactions via /predict, perform liveness checks at /health, and expose metrics at /metrics using prometheus_flask_exporter.
+
+prod-redis: Redis backend handling per-IP request rate limiting (100 requests / minute) for /predict.
+
+prod-nginx: Reverse proxy routing external traffic from port 8085 to the internal API backend.
+
+prod-prometheus: Time-series database scraping service metrics from model-api:5000.
+
+prod-grafana: Visualization dashboard platform pre-provisioned with the Prometheus datasource and featuring a custom request-rate dashboard.
+
+prod-traffic: Sidecar service continuously sending test POST requests to keep live metrics flowing.
+
+Resolved Wiring Faults
+Port Mismatch: Corrected prometheus.yml and nginx.conf where scrape targets and upstream blocks were incorrectly pointed to port 8000, updating them to match the actual Flask container port 5000.
+
+Prometheus Metrics Exporter: Ensured prometheus_flask_exporter (PrometheusMetrics(app)) was correctly initialized inside app/app.py to register the /metrics endpoint.
+
+Grafana Dashboard Provisioning: Programmatically pushed a dashboard via the Grafana API carrying a time-series panel tracking the request rate (rate(flask_http_request_total[1m])).
+
+Verification & End-State Checks
+To verify that the entire stack meets all specifications, run the following inspection commands:
+
+1. Check Container Health & Status
+Bash
+docker inspect model-api prod-redis prod-nginx prod-prometheus prod-grafana prod-traffic --format='{{.Name}}: {{.State.Running}}'
+Expected Result: All containers report true.
+
+2. Verify Flask Metrics Endpoint
+Bash
+curl -s http://localhost:5000/metrics | head -n 15
+Expected Result: Returns standard Prometheus exposition format (HTTP 200).
+
+3. Test Proxy & Model Prediction
+Bash
+curl -X POST http://localhost:8085/predict \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 150.0, "hour": 14, "num_tx_past_day": 2}'
+Expected Result: Returns JSON response containing {"is_fraud": 0} (or 1).
+
+4. Verify Prometheus Targets
+Bash
+curl -s http://localhost:9090/api/v1/targets | grep -o '"health":"up"'
+Expected Result: Confirms the model-api target job is healthy and up.
+
+5. Verify Grafana Datasource & Dashboards
+Bash
+# List datasources
+curl -u admin:grafana2026 http://localhost:3000/api/datasources
+
+# Search user-created dashboards
+curl -u admin:grafana2026 http://localhost:3000/api/search?type=dash-db
+Expected Result: Lists the pre-provisioned Prometheus datasource and the custom "Fraud Detection API Request Rate" dashboard.
