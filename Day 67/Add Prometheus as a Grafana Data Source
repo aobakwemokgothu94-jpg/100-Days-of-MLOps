@@ -1,0 +1,128 @@
+## Fraud Detection Model Monitoring Stack
+This project implements a complete Prometheus and Grafana monitoring stack for a fraud-detection model. It uses a custom Flask metric emitter to generate live machine learning signals and exposes them to Prometheus for scraping and Grafana for visualization.
+
+Architecture & Components
+metric-emitter: A Python/Flask application that exposes real-time ML metrics (flask_http_request_total, prediction_accuracy, data_drift_score, and model_inference_duration_seconds). A background thread updates these values every 5 seconds.
+
+mon-prometheus: A Prometheus instance configured to scrape the metric-emitter service every 5 seconds over the internal Docker network (http://prometheus:9090).
+
+mon-grafana: A Grafana instance configured via its API to connect to Prometheus and display live dashboard panels.
+
+Repository Structure
+Plaintext
+/root/code/monitoring/
+├── docker-compose.yml
+├── Dockerfile
+├── app.py
+└── README.md
+Code Scripts & Configuration Files
+1. docker-compose.yml
+Defines the multi-container Docker stack for the metric emitter, Prometheus, and Grafana.
+
+YAML
+version: '3.8'
+
+services:
+  metric-emitter:
+    build: .
+    container_name: metric-emitter
+    ports:
+      - "5000:5000"
+    networks:
+      - monitoring-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mon-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mon-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana2026
+    networks:
+      - monitoring-net
+
+networks:
+  monitoring-net:
+    driver: bridge
+2. Dockerfile
+Builds the environment for the Flask metric emitter.
+
+Dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir flask prometheus-client numpy
+
+COPY app.py .
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]
+3. app.py
+The Flask application that continuously generates and updates live fraud-detection model metrics.
+
+Python
+import time
+import threading
+import random
+from flask import Flask, Response
+from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
+app = Flask(__name__)
+
+# Define Prometheus metrics
+REQUEST_COUNT = Counter('flask_http_request_total', 'Total HTTP Requests', ['version'])
+PREDICTION_ACCURACY = Gauge('prediction_accuracy', 'Current accuracy of the fraud model')
+DATA_DRIFT_SCORE = Gauge('data_drift_score', 'Data drift score per feature column', ['column'])
+INFERENCE_DURATION = Gauge('model_inference_duration_seconds', 'Model inference duration in seconds')
+
+def background_metrics_updater():
+    """Background thread to update metrics every 5 seconds for real motion."""
+    while True:
+        # Simulate accuracy fluctuation between 85% and 98%
+        PREDICTION_ACCURACY.set(round(random.uniform(0.85, 0.98), 4))
+        
+        # Simulate inference duration between 15ms and 45ms
+        INFERENCE_DURATION.set(round(random.uniform(0.015, 0.045), 4))
+        
+        # Simulate feature data drift scores
+        for col in ['transaction_amount', 'user_age', 'device_risk_score']:
+            DATA_DRIFT_SCORE.labels(column=col).set(round(random.uniform(0.01, 0.15), 4))
+            
+        # Increment request counters
+        REQUEST_COUNT.labels(version='v1.2').inc(random.randint(1, 5))
+        
+        time.sleep(5)
+
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
+if __name__ == '__main__':
+    # Start background metric generator thread
+    t = threading.Thread(target=background_metrics_updater, daemon=True)
+    t.start()
+    
+    app.run(host='0.0.0.0', port=5000)
+Setup & Execution
+Start the Docker containers:
+
+Bash
+docker compose up -d --build
+Access the Grafana UI on port 3000 (admin / grafana2026).
+
+Verify Prometheus is scraping metrics properly at `
