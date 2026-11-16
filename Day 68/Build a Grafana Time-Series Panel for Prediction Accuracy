@@ -1,0 +1,98 @@
+ML Monitoring Dashboard for Fraud Detection
+Overview
+This project sets up and deploys a Grafana monitoring dashboard for the xFusionCorp Industries ML platform team. The dashboard tracks the rolling prediction accuracy (prediction_accuracy) of the fraud-detection model using a pre-provisioned Prometheus data source.
+
+Project Structure
+dashboard.json: The complete JSON definition for the Grafana dashboard containing the timeseries panel targeting the Prometheus metric.
+
+Deployment & Verification Scripts: API curl commands used to programmatically register and verify the dashboard state.
+
+1. Dashboard Configuration (dashboard.json)
+JSON
+{
+  "dashboard": {
+    "id": null,
+    "uid": "fraud-detection-ml",
+    "title": "ML Monitoring Dashboard",
+    "tags": ["ml", "fraud"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "type": "timeseries",
+        "title": "Prediction Accuracy Over Time",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "prediction_accuracy",
+            "refId": "A"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 38,
+    "version": 1
+  },
+  "overwrite": true
+}
+2. Terminal Automation Scripts
+Step A: Create the Dashboard Configuration File
+Run the following bash script to write the dashboard structure locally:
+
+Bash
+cat << 'EOF' > dashboard.json
+{
+  "dashboard": {
+    "id": null,
+    "uid": "fraud-detection-ml",
+    "title": "ML Monitoring Dashboard",
+    "tags": ["ml", "fraud"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "type": "timeseries",
+        "title": "Prediction Accuracy Over Time",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "expr": "prediction_accuracy",
+            "refId": "A"
+          }
+        ]
+      }
+    ],
+    "schemaVersion": 38,
+    "version": 1
+  },
+  "overwrite": true
+}
+EOF
+Step B: Push the Dashboard to Grafana via HTTP API
+Deploy the dashboard directly into the local Grafana instance running on port 3000 using admin credentials (admin / grafana2026):
+
+Bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -u "admin:grafana2026" \
+  -d @dashboard.json \
+  http://localhost:3000/api/dashboards/db
+Step C: Verify Dashboard Registration
+Query the Grafana search API to ensure the dashboard is successfully created and indexed:
+
+Bash
+curl -u "admin:grafana2026" http://localhost:3000/api/search?type=dash-db
