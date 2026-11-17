@@ -1,0 +1,115 @@
+# Grafana Data Drift Monitoring Dashboard (KodeKloud Lab)
+
+Automated provisioning of a Grafana dashboard featuring a **Table** panel to monitor per-feature data drift (`data_drift_score`) for the fraud-detection model.
+
+---
+
+## Architecture Overview
+
++-------------------------------------------------------------+
+|                     Flask Metric-Emitter                    |
+|  - Exposes data_drift_score{column="..."} labeled gauge   |
++------------------------------+------------------------------+
+| Scraped by
+v
++-------------------------------------------------------------+
+|                        Prometheus                           |
+|  - Collects time-series metrics periodically                |
++------------------------------+------------------------------+
+| Queried via Datasource Proxy
+v
++-------------------------------------------------------------+
+|                      Grafana (Port 3000)                    |
+|  - Dashboard: "Model Data Drift Monitoring"                 |
+|  - Panel Type: Table (Displays per-feature drift rows)      |
++-------------------------------------------------------------+
+
+
+---
+
+## Implementation Details
+
+### 1. Dashboard JSON Configuration (`/tmp/dashboard.json`)
+The dashboard payload provisions a table panel linked to the pre-configured Prometheus data source using instant queries (`instant: true`) to render per-feature rows for `data_drift_score`.
+
+```json
+{
+  "dashboard": {
+    "id": null,
+    "title": "Model Data Drift Monitoring",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Feature Data Drift Scores",
+        "type": "table",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "P9182C0E8D71221D4"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "P9182C0E8D71221D4"
+            },
+            "editorMode": "code",
+            "expr": "data_drift_score",
+            "format": "table",
+            "instant": true,
+            "range": false,
+            "refId": "A"
+          }
+        ],
+        "transformations": [],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      }
+    ],
+    "schemaVersion": 38,
+    "version": 1
+  },
+  "overwrite": true
+}
+2. API Deployment Command
+Pushed programmatically via the Grafana HTTP API using admin credentials (admin / grafana2026):
+
+Bash
+curl -s -X POST -u 'admin:grafana2026' \
+  -H "Content-Type: application/json" \
+  --data-binary "@/tmp/dashboard.json" \
+  http://localhost:3000/api/dashboards/db
+Execution Preview & Verification
+API Response (POST /api/dashboards/db)
+JSON
+{
+  "folderUid": "",
+  "id": 1564103068700672,
+  "slug": "model-data-drift-monitoring",
+  "status": "success",
+  "uid": "andpks",
+  "url": "/d/andpks/model-data-drift-monitoring",
+  "version": 1
+}
+Dashboard Search Verification (GET /api/search?type=dash-db)
+JSON
+[
+  {
+    "id": 1564103068700672,
+    "uid": "andpks",
+    "orgId": 1,
+    "title": "Model Data Drift Monitoring",
+    "uri": "db/model-data-drift-monitoring",
+    "url": "/d/andpks/model-data-drift-monitoring",
+    "slug": "",
+    "type": "dash-db",
+    "tags": [],
+    "isStarred": false,
+    "sortMeta": 0,
+    "isDeleted": false
+  }
+]
