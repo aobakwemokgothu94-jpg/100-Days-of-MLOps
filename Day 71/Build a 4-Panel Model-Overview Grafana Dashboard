@@ -1,0 +1,109 @@
+Fraud-Detection Model Quality Gates & Live Monitoring
+This repository enforces automated data and model quality gates for the xFusionCorp Industries fraud-detection pipeline across two stages:
+
+Pre-Deployment CI Gate (Evidently AI): Validates batch data integrity and classification accuracy before model promotion and publishes snapshots to the Evidently UI workspace.
+
+Post-Deployment Live Alerting (Grafana + Prometheus): Continuously monitors smoothed live prediction accuracy and alerts on-call engineers if performance degrades.
+
+Architecture & Thresholds
+Stage	Tooling	Metric / Signal	Gate Condition	Failure Action
+CI Batch Gate	Evidently AI (Report(include_tests=True))	DatasetMissingValueCount	< 10 missing values	Fails CI job (FAIL)
+CI Batch Gate	Evidently AI (Report(include_tests=True))	Accuracy	> 0.80	Fails CI job (FAIL)
+Live Production	Prometheus + Grafana Alerting	avg_over_time(prediction_accuracy[1m])	< 0.80	Fires alert (Low Prediction Accuracy)
+Implementation Details
+1. Evidently Test Suite (/root/code/monitoring/tests/test_suite.py)
+The test suite evaluates /root/code/monitoring/tests/current.csv against a binary classification schema (target="is_fraud", prediction_labels="prediction"), writes structured results to test_results.json, and publishes a run snapshot to the fraud-detector quality gates workspace.
+
+Python
+METRICS = [
+    DatasetMissingValueCount(tests=[lt(10)]),
+    Accuracy(tests=[gt(0.80)]),
+]
+Run the suite:
+
+Bash
+python3 /root/code/monitoring/tests/test_suite.py
+2. Grafana Alert Rule (Low Prediction Accuracy)
+Provisioned under folder ML Monitoring (ml-monitoring) and rule group fraud-detector-alerts:
+
+Query (A): avg_over_time(prediction_accuracy[1m]) (Prometheus datasource)
+
+Reduce (B): Last value of A
+
+Threshold (C): B < 0.80 (lt evaluator)
+
+Previews & Verification Outputs
+Preview 1: CLI Execution & test_results.json
+Plaintext
+Tests: 2/2 passed -> /root/code/monitoring/tests/test_results.json
+  - Count and share of missing values in dataset: Less 10.000: SUCCESS
+  - Accuracy metric: Greater 0.800: SUCCESS
+Run published -- refresh the Evidently UI to inspect it.
+JSON
+{
+  "tests": [
+    {
+      "name": "Count and share of missing values in dataset: Less 10.000",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "Accuracy metric: Greater 0.800",
+      "status": "SUCCESS"
+    }
+  ]
+}
+Preview 2: Evidently UI (http://localhost:8000)
+Project: fraud-detector quality gates → Reports tab
+
+Snapshot Status: 2/2 tests passing (SUCCESS) with full classification confusion matrix, precision/recall breakdown, and dataset missing-value summary.
+
+Preview 3: Grafana Alert Rule Provisioning (http://localhost:3000)
+Path: Alerting → Alert rules → ML Monitoring / fraud-detector-alerts → Low Prediction Accuracy
+
+API Verification (GET /api/v1/provisioning/alert-rules):
+
+JSON
+{
+  "title": "Low Prediction Accuracy",
+  "folderUID": "ml-monitoring",
+  "ruleGroup": "fraud-detector-alerts",
+  "condition": "C",
+  "data": [
+    {
+      "refId": "A",
+      "model": {
+        "expr": "avg_over_time(prediction_accuracy[1m])"
+      }
+    },
+    {
+      "refId": "C",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [0.8],
+              "type": "lt"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+If you'd like to write this directly to /root/code/README.md or /root/code/monitoring/README.md, you can run:
+
+Bash
+cat << 'EOF' > /root/code/monitoring/README.md
+# Fraud-Detection Model Quality Gates & Live Monitoring
+
+Enforces automated quality gates for the xFusionCorp Industries fraud-detection model via an Evidently AI CI test suite and a Prometheus/Grafana live accuracy alert rule.
+
+## Quality Gates Summary
+- **Data Quality (Evidently):** `DatasetMissingValueCount(tests=[lt(10)])`
+- **Model Accuracy (Evidently):** `Accuracy(tests=[gt(0.80)])`
+- **Live Monitoring (Grafana):** `avg_over_time(prediction_accuracy[1m]) < 0.80`
+
+## Usage
+```bash
+python3 /root/code/monitoring/tests/test_suite.py
+EOF
