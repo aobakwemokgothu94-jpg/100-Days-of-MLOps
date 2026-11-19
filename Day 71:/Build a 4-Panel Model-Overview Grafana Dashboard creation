@@ -1,0 +1,72 @@
+# ML Model Observability & Drift Monitoring Dashboard (Grafana + Prometheus + Evidently)
+
+## Overview
+
+This project implements a 4-panel **Model Overview** observability dashboard in Grafana backed by Prometheus metrics and an Evidently AI drift scoring pipeline for the xFusionCorp Industries ML platform (`fraud-detector` service). The dashboard surfaces real-time serving throughput, inference latency, prediction accuracy, and per-feature Population Stability Index (PSI) drift side-by-side for rapid on-call triage.
+
+## Monitoring Stack Architecture
+
+* **Flask Metric-Emitter**: Exposes HTTP traffic counters, model inference latency histograms, prediction accuracy gauges, and republished drift scores.
+* **Evidently AI Drift Scorer**: Recalculates per-feature PSI drift against a reference dataset every 15 seconds and logs scoring runs to the `fraud-detector drift monitoring` project (`01a1f178-e527-7e9c-a2e8-0568943d0a96`).
+* **Prometheus (`http://prometheus:9090`)**: Scrapes application and drift metrics and serves as the pre-provisioned Grafana datasource (`uid: PBFA97CFB590B2093`).
+* **Grafana (`http://localhost:3000`)**: Hosts the provisioned `Model Overview` dashboard (`uid: model-overview`) with a 15-second auto-refresh interval.
+
+## Dashboard Panel Configuration
+
+| Panel ID | Title | Visualization Type | PromQL Query | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `1` | **Request Rate** | `timeseries` | `sum by (version, endpoint, method) (rate(flask_http_request_total[1m]))` | Tracks per-endpoint, method, and model-version request throughput (`req/s`) |
+| `2` | **p95 Inference Latency** | `stat` | `histogram_quantile(0.95, sum by (le) (rate(model_inference_duration_seconds_bucket[5m])))` | Displays 95th-percentile inference latency in seconds |
+| `3` | **Prediction Accuracy** | `gauge` | `prediction_accuracy` | Displays live model prediction accuracy (`0.0`–`1.0` scale) |
+| `4` | **Drift by Column (PSI)** | `bargauge` | `data_drift_score` | Compares per-feature PSI drift (`amount`, `hour`, `num_tx_past_day`) |
+EOF
+Step 2: Append Provisioning Script, API Verification, and Evidence Previews
+Bash
+cat << 'EOF' >> README.md
+
+## Grafana API Provisioning Preview
+
+```python
+import base64
+import json
+import urllib.request
+
+GRAFANA_URL = "http://localhost:3000"
+AUTH_HEADER = "Basic " + base64.b64encode(b"admin:grafana2026").decode("utf-8")
+DS_REF = {"type": "prometheus", "uid": "PBFA97CFB590B2093"}
+
+# Provisioned via POST /api/dashboards/db with uid="model-overview"
+# Panels: Request Rate (timeseries), p95 Inference Latency (stat),
+#         Prediction Accuracy (gauge), Drift by Column (bargauge)
+Verification & Evidence Previews
+1. Grafana Dashboard Search (GET /api/search?type=dash-db)
+JSON
+[
+  {
+    "id": 2036529132093440,
+    "uid": "model-overview",
+    "orgId": 1,
+    "title": "Model Overview",
+    "uri": "db/model-overview",
+    "url": "/d/model-overview/model-overview",
+    "type": "dash-db",
+    "tags": [
+      "evidently",
+      "ml-platform",
+      "monitoring"
+    ]
+  }
+]
+2. Panel & Target Query Inspection
+Plaintext
+1 timeseries -> sum by (version, endpoint, method) (rate(flask_http_request_total[1m]))
+2 stat -> histogram_quantile(0.95, sum by (le) (rate(model_inference_duration_seconds_bucket[5m])))
+3 gauge -> prediction_accuracy
+4 bargauge -> data_drift_score
+3. Evidently AI Drift Monitoring Project Preview
+Project: fraud-detector drift monitoring (01a1f178-e527-7e9c-a2e8-0568943d0a96)
+
+Monitored Features: amount, hour, num_tx_past_day
+
+Drift Metric: ValueDrift (PSI per feature column) and DriftedColumnsCount.share across live scoring runs
+EOF
