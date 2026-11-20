@@ -1,0 +1,66 @@
+# Grafana Webhook Alerting for High-Severity Alerts
+
+## Task Summary
+Configured [Grafana](http://localhost:3000) alerting so that alerts with the label `severity=high` route to the webhook sink endpoint `http://webhook-sink:5000/hook`.
+
+## Provisioning Actions Performed
+
+### 1. Created Webhook Contact Point
+Endpoint: `POST http://admin:grafana2026@localhost:3000/api/v1/provisioning/contact-points`
+
+```json
+{
+  "name": "webhook-oncall",
+  "type": "webhook",
+  "settings": {
+    "url": "http://webhook-sink:5000/hook",
+    "httpMethod": "POST"
+  }
+}
+Response:
+
+JSON
+{
+  "uid": "cg4tmxokn01s0d",
+  "name": "webhook-oncall",
+  "type": "webhook",
+  "settings": {
+    "httpMethod": "POST",
+    "url": "http://webhook-sink:5000/hook"
+  },
+  "disableResolveMessage": false
+}
+2. Updated Notification Policy Tree
+Endpoint: PUT http://admin:grafana2026@localhost:3000/api/v1/provisioning/policies
+
+Preserved existing root receiver "empty" and added a route matching severity = high to receiver "webhook-oncall".
+
+JSON
+{
+  "receiver": "empty",
+  "group_by": [
+    "grafana_folder",
+    "alertname"
+  ],
+  "routes": [
+    {
+      "receiver": "webhook-oncall",
+      "object_matchers": [
+        [
+          "severity",
+          "=",
+          "high"
+        ]
+      ]
+    }
+  ]
+}
+Response:
+
+JSON
+{"message":"policies updated"}
+Verification
+Bash
+curl -s http://admin:grafana2026@localhost:3000/api/v1/provisioning/contact-points | jq
+curl -s http://admin:grafana2026@localhost:3000/api/v1/provisioning/policies | jq
+EOF
