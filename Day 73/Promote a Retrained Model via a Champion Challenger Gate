@@ -1,0 +1,79 @@
+Day 73: Promote a Retrained Model via a Champion/Challenger Gate
+Overview
+Implemented a metric-gated champion/challenger promotion script (/root/code/monitoring/promote.py) for the fraud-detector model registered in MLflow on the KodeKloud Task environment. Instead of promoting retrained models blindly, the gate compares the f1_score of the version currently serving the production alias against challenger version 2, re-pointing the production alias to version 2 only when challenger_f1 > champion_f1 (0.82 > 0.71).
+
+Architecture Diagram
+Plaintext
++-------------------------------------------------------------------+
+|                     MLflow Tracking & Registry                    |
+|                     (http://localhost:5000)                       |
+|                                                                   |
+|  Model: fraud-detector                                            |
+|    +-- v1 (incumbent): f1_score = 0.71                            |
+|    +-- v2 (challenger): f1_score = 0.82  --> alias: "production"  |
++---------------------------------+---------------------------------+
+                                  ^
+                                  | get_model_version_by_alias("fraud-detector", "production")
+                                  | f1_of(version) -> run.data.metrics["f1_score"]
+                                  | set_registered_model_alias("fraud-detector", "production", "2")
++---------------------------------+---------------------------------+
+|                 Champion/Challenger Gate Script                   |
+|                 /root/code/monitoring/promote.py                  |
+|                                                                   |
+|  1. Resolve current champion via "production" alias               |
+|  2. Fetch champion f1_score and challenger (v2) f1_score          |
+|  3. If challenger_f1 > champion_f1: promote v2 to "production"    |
+|     Else: leave alias untouched                                   |
++-------------------------------------------------------------------+
+Implementation (promote.py)
+Python
+from mlflow import MlflowClient
+
+TRACKING_URI = "http://localhost:5000"
+MODEL = "fraud-detector"
+PROD_ALIAS = "production"
+CHALLENGER_VERSION = "2"
+
+client = MlflowClient(tracking_uri=TRACKING_URI)
+
+
+def f1_of(version: str) -> float:
+    mv = client.get_model_version(MODEL, version)
+    return client.get_run(mv.run_id).data.metrics["f1_score"]
+
+
+def main() -> None:
+    champ = client.get_model_version_by_alias(MODEL, PROD_ALIAS)
+    c_f1 = f1_of(champ.version)
+    x_f1 = f1_of(CHALLENGER_VERSION)
+    if x_f1 > c_f1:
+        client.set_registered_model_alias(MODEL, PROD_ALIAS, CHALLENGER_VERSION)
+        print(f"Promoted v{CHALLENGER_VERSION} ({x_f1} > {c_f1})")
+    else:
+        print(f"Rejected v{CHALLENGER_VERSION} ({x_f1} <= {c_f1})")
+
+
+if __name__ == "__main__":
+    main()
+Execution & Verification Previews
+1. Seeding Incumbent & Challenger Versions (skops Trusted Type Workaround)
+Plaintext
+Successfully registered model 'fraud-detector'.
+Created version '1' of model 'fraud-detector'.
+Registered model 'fraud-detector' already exists. Creating a new version of this model...
+Created version '2' of model 'fraud-detector'.
+Current production before gate: 1
+2. Promotion Gate Execution & Alias Check
+Plaintext
+Promoted v2 to production (0.82 > 0.71)
+Production version: 2 Aliases: ['production']
+3. Idempotent Re-Run Check (After Promotion)
+Plaintext
+Rejected v2 (0.82 <= 0.82)
+Production: 2
+Key Takeaways
+Alias-Driven Serving: MLflow 3.x uses model aliases such as production (models:/fraud-detector@production) rather than legacy stage transitions, allowing zero-downtime pointer updates once validation passes.
+
+Strict Metric Gating: Checking challenger_f1 > champion_f1 prevents lower- or equal-performing candidates from replacing the active production model.
+
+Safe Environment Handling: Keeping /root/code/monitoring/retrain_pipeline.py untouched on disk while addressing the MLflow skops sklearn.tree._tree.Tree check preserved the lab's baseline setup.
