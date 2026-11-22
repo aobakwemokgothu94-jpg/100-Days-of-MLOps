@@ -1,0 +1,63 @@
+# xFusionCorp ML Fraud Amount Monitoring (`fraud_amount_usd_total`)
+
+Adds version-labelled fraudulent transaction USD tracking to the Flask metric emitter, verifies Prometheus ingestion, and provisions a version-filterable Grafana dashboard.
+
+## Architecture & Changes
+
+* **Metric Emitter (`/root/code/monitoring/app/metric_emitter.py`):** Added `FRAUD_AMOUNT_USD` (`fraud_amount_usd_total` Counter with `version` label) and incremented it with simulated USD amounts per version inside `_nudge_metrics()` on each 5-second tick.
+* **Container & Scrape Pipeline:** Restarted `metric-emitter` and verified Prometheus (`mon-prometheus`) scrapes active `version="v1"` and `version="v2"` series.
+* **Grafana Dashboard (`fraud-ml`):** Created **ML Fraud Monitoring** on `mon-grafana` (`:3000`) bound to Prometheus datasource `PBFA97CFB590B2093`:
+  * **Templating variable (`version`):** `label_values(fraud_amount_usd_total, version)` (multi-value + All enabled).
+  * **Panel (`Fraud Amount USD`):** Time-series query `fraud_amount_usd_total{version=~"$version"}`.
+
+## Applied Commands
+
+```bash
+sed -i '/INFERENCE_LATENCY = Histogram/i FRAUD_AMOUNT_USD = Counter("fraud_amount_usd_total", "Total fraud USD", ["version"], registry=REGISTRY)\n' /root/code/monitoring/app/metric_emitter.py
+sed -i '/REQUEST_TOTAL.labels/a \            FRAUD_AMOUNT_USD.labels(version=version).inc(random.uniform(25.0, 250.0))' /root/code/monitoring/app/metric_emitter.py
+docker restart metric-emitter
+
+curl -s "http://localhost:9090/api/v1/query?query=fraud_amount_usd_total"
+
+DS=$(curl -su admin:grafana2026 http://localhost:3000/api/datasources | python3 -c "import sys,json;print(next(d['uid'] for d in json.load(sys.stdin) if d['type']=='prometheus'))")
+curl -su admin:grafana2026 -H "Content-Type: application/json" -X POST http://localhost:3000/api/dashboards/db -d "{\"overwrite\":true,\"dashboard\":{\"uid\":\"fraud-ml\",\"title\":\"ML Fraud Monitoring\",\"templating\":{\"list\":[{\"name\":\"version\",\"type\":\"query\",\"datasource\":{\"type\":\"prometheus\",\"uid\":\"$DS\"},\"query\":\"label_values(fraud_amount_usd_total, version)\",\"includeAll\":true,\"multi\":true}]},\"panels\":[{\"id\":1,\"type\":\"timeseries\",\"title\":\"Fraud Amount USD\",\"gridPos\":{\"h\":8,\"w\":24,\"x\":0,\"y\":0},\"datasource\":{\"type\":\"prometheus\",\"uid\":\"$DS\"},\"targets\":[{\"refId\":\"A\",\"expr\":\"fraud_amount_usd_total{version=~\\\"\$version\\\"}\"}]}]}}"
+Verification
+Bash
+curl -su admin:grafana2026 http://localhost:3000/api/dashboards/uid/fraud-ml | python3 -c "import sys,json;d=json.load(sys.stdin)['dashboard'];print('Vars:',d['templating']['list']);print('Targets:',d['panels'][0]['targets'])"
+
+---
+
+### 2. Terminal & Configuration Previews
+
+#### **Prometheus Live Query Preview**
+```json
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "fraud_amount_usd_total",
+          "instance": "metric-emitter:5000",
+          "job": "metric-emitter",
+          "version": "v1"
+        },
+        "value": [1795342209.043, "7131.401820974843"]
+      },
+      {
+        "metric": {
+          "__name__": "fraud_amount_usd_total",
+          "instance": "metric-emitter:5000",
+          "job": "metric-emitter",
+          "version": "v2"
+        },
+        "value": [1795342209.043, "2483.760860955334"]
+      }
+    ]
+  }
+}
+Grafana Dashboard Read-Back Preview
+Plaintext
+Vars: [{'datasource': {'type': 'prometheus', 'uid': 'PBFA97CFB590B2093'}, 'includeAll': True, 'multi': True, 'name': 'version', 'query': 'label_values(fraud_amount_usd_total, version)', 'type': 'query'}]
+Targets: [{'expr': 'fraud_amount_usd_total{version=~"$version"}', 'refId': 'A'}]
