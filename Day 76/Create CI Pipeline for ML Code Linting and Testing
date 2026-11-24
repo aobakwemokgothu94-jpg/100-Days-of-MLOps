@@ -1,0 +1,184 @@
+# Automated CI Pipeline Integration with Gitea Actions (`fraud-detector`)
+
+## Overview
+Implemented an automated Continuous Integration (CI) workflow using **Gitea Actions** for the `fraud-detector` machine learning repository at **xFusionCorp Industries**. By activating and configuring the repository's `.gitea/workflows/ci.yml` pipeline on a dedicated `add-ci` feature branch, every pull request targeting `main` automatically triggers static code linting via **Ruff** and unit testing via **pytest** on a self-hosted runner prior to code review and merge.
+
+---
+
+## Architecture & CI Workflow Flow
+
+1. **Feature Branch Development (`add-ci`):** Renamed the inert `.gitea/workflows/ci.yml.template` scaffold to `.gitea/workflows/ci.yml` and populated the `lint` and `test` execution steps.
+2. **Pull Request Trigger (`pull_request` -> `main`):** Opening PR `#1` (`add-ci` -> `main`) automatically dispatched two concurrent jobs (`lint` and `test`) to the registered self-hosted Gitea Actions runner.
+3. **Quality Gate & Merge:** Once both jobs passed and the head commit (`6d6bd5e`) reported `combined status: success` on the Gitea Status API, PR `#1` was merged into `main`.
+
+---
+
+## Repository Structure
+
+```text
+/root/code/fraud-detector/
+├── .gitea/
+│   └── workflows/
+│       └── ci.yml           # Active Gitea Actions CI pipeline (lint + test)
+├── src/
+│   └── train.py             # Deterministic synthetic fraud-detection training module
+├── tests/
+│   └── test_train.py        # Unit test suite (3 test cases)
+├── pyproject.toml           # Project dependencies, Ruff lint rules, and pytest config
+└── README.md
+Configuration & Scripts
+1. Gitea Actions CI Workflow (.gitea/workflows/ci.yml)
+YAML
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install --break-system-packages pytest
+      - name: Run pytest
+        run: pytest tests/ -v
+2. Project & Tooling Configuration (pyproject.toml)
+Ini, TOML
+[project]
+name = "fraud-detector"
+version = "0.1.0"
+description = "xFusionCorp fraud-detection model (CI/CD section scaffold)"
+requires-python = ">=3.10"
+dependencies = [
+    "joblib>=1.3",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "ruff>=0.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+3. End-to-End Automation & API Verification Script (verify_ci_pipeline.py)
+Python
+import base64
+import json
+import urllib.request
+import yaml
+
+AUTH = base64.b64encode(b"gitea-admin:gitea2026").decode()
+HEADERS = {"Authorization": f"Basic {AUTH}", "Content-Type": "application/json"}
+BASE_URL = "http://localhost:3000/api/v1"
+
+
+def api(path: str, method: str = "GET", body: bytes | None = None) -> dict:
+    req = urllib.request.Request(
+        f"{BASE_URL}{path}", data=body, headers=HEADERS, method=method
+    )
+    with urllib.request.urlopen(req) as resp:
+        return json.loads(resp.read().decode())
+
+
+# 1. Validate workflow YAML structure on add-ci
+with open(".gitea/workflows/ci.yml", encoding="utf-8") as f:
+    wf = yaml.safe_load(f)
+print("1. YAML jobs on add-ci:", list(wf.get("jobs", {}).keys()))
+
+# 2. Verify PR #1 metadata
+pr = api("/repos/gitea-admin/fraud-detector/pulls/1")
+sha = pr["head"]["sha"]
+print(
+    f"2. PR #1: head={pr['head']['ref']} -> base={pr['base']['ref']} "
+    f"| state={pr['state']} | merged={pr['merged']}"
+)
+
+# 3. Verify head commit combined status
+status = api(f"/repos/gitea-admin/fraud-detector/commits/{sha}/status")
+print(f"3. Commit {sha[:7]} combined status: {status.get('state')}")
+
+# 4. Merge if approved and not yet merged
+if status.get("state") == "success" and not pr["merged"]:
+    api(
+        "/repos/gitea-admin/fraud-detector/pulls/1/merge",
+        method="POST",
+        body=b'{"Do":"merge"}',
+    )
+    pr = api("/repos/gitea-admin/fraud-detector/pulls/1")
+    print(f"4. Merged PR #1 -> merged={pr['merged']} | state={pr['state']}")
+Implementation & Execution Previews
+Step 1: Feature Branch Setup & Local Validation
+Bash
+root@controlplane ~/code ➜ cd /root/code/fraud-detector && \
+git checkout -b add-ci && \
+git mv .gitea/workflows/ci.yml.template .gitea/workflows/ci.yml
+
+# Populate .gitea/workflows/ci.yml with ruff and pytest commands, then validate locally:
+root@controlplane fraud-detector on  add-ci via 🐍 v3.12.3 ➜ python3 -c "import yaml; yaml.safe_load(open('.gitea/workflows/ci.yml')); print('YAML valid')" && \
+ruff check src tests && \
+pytest tests/ -v
+Terminal Output Preview:
+
+Plaintext
+YAML valid
+All checks passed!
+============ test session starts ============
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /root/code/fraud-detector
+configfile: pyproject.toml
+testpaths: tests
+collected 3 items
+
+tests/test_train.py ...               [100%]
+
+============= 3 passed in 0.99s =============
+Step 2: Troubleshooting & Resolving Initial Runner Failure
+Issue: During the initial push (d9ef85a), the # TODO: comments remained in place on the run: keys, causing YAML to parse those values as null and triggering a Combined status: failure on PR #1.
+
+Resolution: Replaced the # TODO: markers with ruff check src tests and pytest tests/ -v, committed the fix (6d6bd5e), and pushed to origin/add-ci, automatically re-triggering the Gitea Actions runner checks.
+
+Step 3: API Verification & Pull Request Merge Preview
+Plaintext
+1. YAML jobs on add-ci: ['lint', 'test']
+2. PR #1: head=add-ci -> base=main | state=closed | merged=True
+3. Commit 6d6bd5e combined status: success
+Verification Checklist
+[x] .gitea/workflows/ci.yml exists on branch add-ci, parses as valid YAML, and defines both lint and test jobs.
+
+[x] Pull request #1 created targeting main from head branch add-ci.
+
+[x] Head commit 6d6bd5e reports state: "success" via GET /api/v1/repos/gitea-admin/fraud-detector/commits/6d6bd5e.../status.
+
+[x] Pull request #1 merged cleanly into main (merged: true).
