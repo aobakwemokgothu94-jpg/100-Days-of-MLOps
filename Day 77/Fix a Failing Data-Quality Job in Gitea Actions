@@ -1,0 +1,142 @@
+# Gitea Actions CI Data-Quality Gate Remediation (`fraud-detector`)
+
+## Overview
+Resolved a failing Continuous Integration (CI) pull request check (`data-quality`) in the `fraud-detector` repository hosted on Gitea. The ML platform team requires automated data-schema validation tests to execute as a mandatory CI gate on every pull request before training data changes can affect downstream fraud-detection models.
+
+## Root Cause Analysis
+- **Workflow File:** `.gitea/workflows/ci.yml`
+- **Target Branch:** `add-data-validation` (Pull Request #1: *Add data-quality CI gate*)
+- **Failure Symptom:** The `lint` and `test` jobs passed, while the `data-quality` job failed during test collection.
+- **Root Cause:** The `data-quality` job executed `python3 -m pytest tests/test_data_validation.py -v`, referencing a non-existent test file. Inspection of the repository's `tests/` directory revealed the actual data-schema test suite was named `tests/test_data_quality.py`.
+
+## Architecture & Workflow Jobs
+| Job | Runner | Command | Purpose |
+| :--- | :--- | :--- | :--- |
+| `lint` | `ubuntu-latest` | `ruff check src tests` | Static code style and lint enforcement |
+| `test` | `ubuntu-latest` | `python3 -m pytest tests/test_train.py -v` | Unit testing for model training logic |
+| `data-quality` | `ubuntu-latest` | `python3 -m pytest tests/test_data_quality.py -v` | Data-schema validation gate for PRs |
+
+## Remediation Steps
+1. **Repository & Workflow Inspection:** Audited the `add-data-validation` working tree (`/root/code/fraud-detector`) and compared test filenames against `.gitea/workflows/ci.yml`.
+2. **Workflow Path Correction:** Updated the `pytest` invocation inside the `data-quality` job from `tests/test_data_validation.py` to `tests/test_data_quality.py` while preserving the job structure.
+3. **Commit & Push:** Committed the fix (`767fb27`) to `origin/add-data-validation` to re-trigger the pull request CI workflow.
+4. **API Verification:** Queried the Gitea commit status API (`/api/v1/repos/gitea-admin/fraud-detector/commits/767fb27/status`) to confirm the combined status reached `success` across all three jobs.
+
+## Troubleshooting Log
+| Issue | Symptom | Fix |
+| :--- | :--- | :--- |
+| Mismatched `pytest` target path in `.gitea/workflows/ci.yml` | `data-quality` job failed on initial PR run (`tests/test_data_validation.py` not found) | Updated `pytest` target to `tests/test_data_quality.py` and pushed commit `767fb27` to `add-data-validation` |
+
+## Updated Workflow (`.gitea/workflows/ci.yml`)
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest
+        run: pip install --break-system-packages pytest
+      - name: Run pytest
+        run: python3 -m pytest tests/test_train.py -v
+
+  data-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest + pandas
+        run: pip install --break-system-packages pytest pandas
+      - name: Run data-quality tests
+        run: python3 -m pytest tests/test_data_quality.py -v
+```
+Execution & Verification Previews (PREVIEWS.md)
+Markdown
+# Execution & Verification Previews
+
+## 1. Repository & Workflow Audit
+```text
+$ cd /root/code/fraud-detector && git status && find . -maxdepth 3 -not -path '*/.*'
+On branch add-data-validation
+Your branch is up to date with 'origin/add-data-validation'.
+
+nothing to commit, working tree clean
+.
+./pyproject.toml
+./src
+./src/train.py
+./src/__init__.py
+./tests
+./tests/test_train.py
+./tests/__init__.py
+./tests/test_data_quality.py
+./README.md
+```
+
+## 2. Workflow Diff & Git Push
+```text
+$ sed -i 's|tests/test_data_validation.py|tests/test_data_quality.py|' .gitea/workflows/ci.yml && git diff .gitea/workflows/ci.yml
+diff --git a/.gitea/workflows/ci.yml b/.gitea/workflows/ci.yml
+index 56ce67b..a8b3284 100644
+--- a/.gitea/workflows/ci.yml
++++ b/.gitea/workflows/ci.yml
+@@ -32,4 +32,4 @@ jobs:
+       - name: Install pytest + pandas
+         run: pip install --break-system-packages pytest pandas
+       - name: Run data-quality tests
+-        run: python3 -m pytest tests/test_data_validation.py -v
++        run: python3 -m pytest tests/test_data_quality.py -v
+
+$ git add .gitea/workflows/ci.yml && git commit -m "Fix data-quality test path in CI workflow" && git push origin add-data-validation
+[add-data-validation 767fb27] Fix data-quality test path in CI workflow
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To http://localhost:3000/gitea-admin/fraud-detector.git
+   9afcb38..767fb27  add-data-validation -> add-data-validation
+```
+
+## 3. Gitea Commit Status API Verification
+```json
+{
+    "state": "success",
+    "sha": "767fb27ac3900b3725126c2b9e2313e60f275f79",
+    "total_count": 3,
+    "statuses": [
+        {
+            "id": 4,
+            "status": "success",
+            "target_url": "/gitea-admin/fraud-detector/actions/runs/4/jobs/0",
+            "description": "Successful in 3s",
+            "context": "CI / lint (pull_request)"
+        },
+        {
+            "id": 5,
+            "status": "success",
+            "target_url": "/gitea-admin/fraud-detector/actions/runs/4/jobs/1",
+            "description": "Successful in 5s",
+            "context": "CI / test (pull_request)"
+        },
+        {
+            "id": 6,
+            "status": "success",
+            "target_url": "/gitea-admin/fraud-detector/actions/runs/4/jobs/2",
+            "description": "Successful in 4s",
+            "context": "CI / data-quality (pull_request)"
+        }
+    ]
+}
+```
