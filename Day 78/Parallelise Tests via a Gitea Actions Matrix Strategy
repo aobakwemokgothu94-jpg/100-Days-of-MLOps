@@ -1,0 +1,71 @@
+## Overview
+
+Converted the serial `test` job in `.gitea/workflows/ci.yml` into a parallel Gitea Actions matrix across the `train`, `data_quality`, and `model_contract` test suites on branch `add-test-matrix` (`http://localhost:3000/gitea-admin/fraud-detector/pulls/1`), while keeping the `lint` job intact.
+
+- **Matrix axis (`strategy.matrix.suite`)**: `train`, `data_quality`, `model_contract`
+- **Target test files**: `tests/test_train.py`, `tests/test_data_quality.py`, `tests/test_model_contract.py`
+- **Verified commit**: `cca4ddd3b6294161c5fc90833195fa2b014917fd`
+
+## Workflow Configuration (`.gitea/workflows/ci.yml`)
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+    branches: ["**"]
+  push:
+    branches: ["**"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ruff
+        run: pip install --break-system-packages ruff
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - train
+          - data_quality
+          - model_contract
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pytest + runtime deps
+        run: pip install --break-system-packages pytest pandas numpy scikit-learn joblib
+      - name: Run ${{ matrix.suite }} test suite
+        run: python3 -m pytest "tests/test_${{ matrix.suite }}.py" -v
+Execution Previews
+1. Local Test Suites (pytest)
+Plaintext
+tests/test_train.py ...               [100%]
+============= 3 passed in 0.92s =============
+
+tests/test_data_quality.py ....       [100%]
+============= 4 passed in 0.34s =============
+
+tests/test_model_contract.py ...      [100%]
+============= 3 passed in 0.89s =============
+2. Git Push & Commit Status Verification
+Plaintext
+[add-test-matrix cca4ddd] Restore runtime dependencies in matrix test job
+ 1 file changed, 7 insertions(+), 12 deletions(-)
+To http://localhost:3000/gitea-admin/fraud-detector.git
+   9c26c37..cca4ddd  add-test-matrix -> add-test-matrix
+
+STATE: success
+CI / lint (push) -> success
+CI / test (data_quality) (push) -> success
+CI / test (model_contract) (push) -> success
+CI / test (train) (push) -> success
+CI / lint (pull_request) -> success
+CI / test (data_quality) (pull_request) -> success
+CI / test (model_contract) (pull_request) -> success
+CI / test (train) (pull_request) -> success
