@@ -1,0 +1,23 @@
+# Day 79: Publish CI Training Artefacts via `upload-artifact`
+
+## Overview
+Configured the Gitea Actions CI workflow in the `fraud-detector` repository (`add-artifact-upload` branch) to persist machine learning model training outputs (`metrics.json` and `confusion_matrix.png`) as a downloadable archive (`model-report`) at the end of the `report` job, preventing artifact loss upon runner teardown.
+
+## Repository & Environment Details
+* **Repository:** `gitea-admin/fraud-detector` (`http://localhost:3000/gitea-admin/fraud-detector`)
+* **Working Directory:** `/root/code/fraud-detector`
+* **Branch:** `add-artifact-upload`
+* **Pull Request:** *Publish Training Artifacts from CI*
+* **Workflow File:** `.gitea/workflows/ci.yml`
+
+## Workflow Configuration (`.gitea/workflows/ci.yml`)
+Appended the `actions/upload-artifact@v3` step to the `report` job immediately following artifact generation (`src.train` and `src.plot`):
+
+```yaml
+      - name: List produced artefacts
+        run: ls -la artifacts/
+      - name: Upload model report artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-report
+          path: artifacts/
